@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/astaxie/beego/orm"
+	_ "github.com/go-sql-driver/mysql"
 	"path"
 )
 
@@ -83,6 +85,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	}
 	var appYamlJson AppYaml
 	if err := json.Unmarshal([]byte(appyaml), &appYamlJson); err != nil {
+		fmt.Println("app.yaml ", err, appyaml)
 		return nil
 	}
 

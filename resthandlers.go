@@ -8,7 +8,8 @@ import (
 
 type JsonTmpl map[string]interface{}
 
-func RegisterApplicationHandler(w *http.ResponseWriter, req *http.Request) {
+func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
 	projectname := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	appyaml := req.Form.Get("appyaml")
