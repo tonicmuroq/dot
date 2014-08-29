@@ -43,7 +43,7 @@ func (self *Hub) checkAlive() {
 			// 类型真恶心, 自动转换会死啊
 			// 如果一个连接不再存在, 那么先关闭连接, 再删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
-				log.Println("%s is disconnected.", host)
+				log.Println(host, " is disconnected.")
 				conn, err := self.connections[host]
 				if err {
 					conn.closeConnection()
