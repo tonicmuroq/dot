@@ -2,14 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/astaxie/beego/orm"
+	"path"
 )
 
 const (
 	appPathPrefix = "/nbe/app/"
 )
 
-// etcd
+// etcdClient
 
 var db orm.Ormer
 
@@ -80,12 +82,12 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		configyaml = "{}"
 	}
 	var appYamlJson AppYaml
-	if err := json.Unmarshal(appyaml, &appYamlJson); err != nil {
+	if err := json.Unmarshal([]byte(appyaml), &appYamlJson); err != nil {
 		return nil
 	}
 
 	// 生成新用户
-	appName := appYamlJson["appname"]
+	appName := appYamlJson.Appname
 	user := User{Name: appName}
 	if _, id, err := db.ReadOrCreate(&user, "Name"); err == nil {
 		user.Id = int(id)
@@ -95,13 +97,13 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 
 	// 用户绑定应用
 	app := Application{Name: appName, Version: version, Pname: projectname, User: &user}
-	if _, err = db.Insert(&app); err != nil {
+	if _, err := db.Insert(&app); err != nil {
 		return nil
 	}
 
 	// 保存配置文件
-	etcd.Create(self.GetYamlPath("app"), appyaml, 0)
-	etcd.Create(self.GetYamlPath("config"), configyaml, 0)
+	etcdClient.Create((&app).GetYamlPath("app"), appyaml, 0)
+	etcdClient.Create((&app).GetYamlPath("config"), configyaml, 0)
 
 	return &app
 }
@@ -115,40 +117,40 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 	return &app
 }
 
-func (self *Application) GetYamlPath(path string) string {
-	return path.Join(appPathPrefix, self.name, self.version, paht+".yaml")
+func (self *Application) GetYamlPath(cpath string) string {
+	return path.Join(appPathPrefix, self.Name, self.Version, cpath+".yaml")
 }
 
-func (self *Application) GetAppYaml() (string, error) {
-	path := self.GetYamlPath("app")
-	r, err := self.etcd.Get(path, false, false)
-	if err != nil {
-		return appYaml, err
-	}
-	if r.Node.Dir {
-		return appYaml, error.New("should not be dir")
-	}
+func (self *Application) GetAppYaml() (*AppYaml, error) {
 	var appYaml AppYaml
-	if err = json.Unmarshal(r.Node.Value, &appYaml); err != nil {
-		return appYaml, err
-	}
-	return appYaml, nil
-}
-
-func (self *Application) GetConfigYaml() (string, error) {
-	path := self.GetYamlPath("config")
-	r, err := self.etcd.Get(path, false, false)
+	cpath := self.GetYamlPath("app")
+	r, err := etcdClient.Get(cpath, false, false)
 	if err != nil {
-		return appYaml, err
+		return &appYaml, err
 	}
 	if r.Node.Dir {
-		return appYaml, error.New("should not be dir")
+		return &appYaml, errors.New("should not be dir")
 	}
+	if err = json.Unmarshal(r.Node.Value, &appYaml); err != nil {
+		return &appYaml, err
+	}
+	return &appYaml, nil
+}
+
+func (self *Application) GetConfigYaml() (*ConfigYaml, error) {
 	var configYaml ConfigYaml
-	if err = json.Unmarshal(r.Node.Value, &configYaml); err != nil {
-		return configYaml, err
+	cpath := self.GetYamlPath("config")
+	r, err := etcdClient.Get(cpath, false, false)
+	if err != nil {
+		return &configYaml, err
 	}
-	return configYaml, nil
+	if r.Node.Dir {
+		return &configYaml, errors.New("should not be dir")
+	}
+	if err = json.Unmarshal(r.Node.Value, &configYaml); err != nil {
+		return &configYaml, err
+	}
+	return &configYaml, nil
 }
 
 func (self *Application) UserUid() int {
@@ -188,8 +190,8 @@ func (self *Container) TableIndex() [][]string {
 }
 
 func NewContainer(app *Application, host *Host) *Container {
-	c := Container{AppName: app.Name, AppVersion: app.Version, Host: &host}
-	if err := db.Insert(&c); err == nil {
+	c := Container{AppName: app.Name, AppVersion: app.Version, Host: host}
+	if _, err := db.Insert(&c); err == nil {
 		return &c
 	}
 	return nil
