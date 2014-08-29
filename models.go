@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/astaxie/beego/orm"
+	"github.com/coreos/go-etcd/etcd"
 	_ "github.com/go-sql-driver/mysql"
 	"path"
 )
@@ -16,6 +16,7 @@ const (
 // etcdClient
 
 var db orm.Ormer
+var etcdClient *etcd.Client
 
 type Task struct {
 	Uuid        string
@@ -61,14 +62,22 @@ type AppYaml struct {
 
 type ConfigYaml map[string]interface{}
 
-// ORM
+// models 初始化
+// 连接 mysql
+// 连接 etcd
+// 可能还需要连接 redis
 func init() {
+	// mysql
 	// TODO 改成参数配置
 	orm.RegisterDataBase("default", "mysql", "root:@/dot?charset=utf8", 30)
 	orm.RegisterModel(new(Application))
 	orm.RegisterModel(new(User))
 	orm.RunSyncdb("default", true, true)
 	db = orm.NewOrm()
+
+	// etcd
+	etcdClient = etcd.NewClient([]string{"http://localhost:4001", "http://localhost:4002"})
+	etcdClient.SyncCluster()
 }
 
 // Application
@@ -84,7 +93,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		configyaml = "{}"
 	}
 	var appYamlJson AppYaml
-	if err := json.Unmarshal([]byte(appyaml), &appYamlJson); err != nil {
+	if err := JSONDecode(appyaml, &appYamlJson); err != nil {
 		fmt.Println("app.yaml ", err, appyaml)
 		return nil
 	}
@@ -134,7 +143,7 @@ func (self *Application) GetAppYaml() (*AppYaml, error) {
 	if r.Node.Dir {
 		return &appYaml, errors.New("should not be dir")
 	}
-	if err = json.Unmarshal(r.Node.Value, &appYaml); err != nil {
+	if err = JSONDecode(r.Node.Value, &appYaml); err != nil {
 		return &appYaml, err
 	}
 	return &appYaml, nil
@@ -150,7 +159,7 @@ func (self *Application) GetConfigYaml() (*ConfigYaml, error) {
 	if r.Node.Dir {
 		return &configYaml, errors.New("should not be dir")
 	}
-	if err = json.Unmarshal(r.Node.Value, &configYaml); err != nil {
+	if err = JSONDecode(r.Node.Value, &configYaml); err != nil {
 		return &configYaml, err
 	}
 	return &configYaml, nil

@@ -140,14 +140,22 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
+
+	// 拿 ip:port
 	rs := strings.Split(r.RemoteAddr, ":")
+	ip := rs[0]
 	port, _ := strconv.Atoi(rs[1])
+
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	c := &Connection{ws: ws, host: rs[0], port: port}
+
+	// 创建个新连接, 新建一条host记录
+	// 同时开始 listen
+	c := &Connection{ws: ws, host: ip, port: port}
 	hub.addConnection(c)
+	NewHost(ip, "")
 	go c.listen()
 }

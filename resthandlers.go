@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 )
@@ -20,6 +19,6 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "error"
 	}
-	b, _ := json.Marshal(r)
-	io.WriteString(w, string(b))
+	b, _ := JSONEncode(r)
+	io.WriteString(w, b)
 }
