@@ -2,37 +2,37 @@ package main
 
 import (
 	"log"
+	"sync"
 	"time"
 )
 
-type TaskQueue struct {
+type TaskHub struct {
 	queue chan *[]byte
 	size  int
+	wg    *sync.WaitGroup
 }
 
-var taskqueue *TaskQueue
+var taskhub *TaskHub
 
-func (self *TaskQueue) GetTask() *[]byte {
+func (self *TaskHub) GetTask() *[]byte {
 	return <-self.queue
 }
 
-func (self *TaskQueue) AddTask(task *[]byte) {
+func (self *TaskHub) AddTask(task *[]byte) {
 	self.queue <- task
 	log.Println(len(self.queue))
 	if len(self.queue) >= self.size {
-		// do deploy
-		log.Println("full, do deploy")
-		self.DoDeploy()
+		log.Println("full, do dispatch")
+		self.Dispatch()
 	}
 }
 
-func (self *TaskQueue) Run() {
+func (self *TaskHub) Run() {
 	for {
 		count := len(self.queue)
 		if count > 0 {
-			// do deploy
 			log.Println("period check")
-			self.DoDeploy()
+			self.Dispatch()
 			log.Println("period check done")
 		} else {
 			log.Println("empty")
@@ -41,7 +41,7 @@ func (self *TaskQueue) Run() {
 	}
 }
 
-func (self *TaskQueue) DoDeploy() {
+func (self *TaskHub) Dispatch() {
 	count := len(self.queue)
 	for i := 0; i < count; i = i + 1 {
 		d := self.GetTask()
@@ -51,5 +51,5 @@ func (self *TaskQueue) DoDeploy() {
 
 func init() {
 	// TODO size shall be in arguments
-	taskqueue = &TaskQueue{queue: make(chan *[]byte, 5), size: 5}
+	taskhub = &TaskHub{queue: make(chan *[]byte, 5), size: 5, wg: &sync.WaitGroup{}}
 }

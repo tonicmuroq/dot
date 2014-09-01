@@ -7,7 +7,7 @@ import (
 
 func main() {
 	go hub.CheckAlive()
-	go taskqueue.Run()
+	go taskhub.Run()
 
 	http.Handle("/", restserver)
 	http.HandleFunc("/ws", ServeWs)
