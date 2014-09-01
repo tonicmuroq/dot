@@ -23,9 +23,10 @@ var upgrader = websocket.Upgrader{
 
 // websocket 连接
 type Connection struct {
-	ws   *websocket.Conn
-	host string
-	port int
+	ws     *websocket.Conn
+	host   string
+	port   int
+	closed bool
 }
 
 // 保存所有连接, 定时 ping
@@ -87,6 +88,19 @@ func (self *Hub) PutConnection(conn *Connection) {
 	}
 }
 
+func (self *Hub) RemoveConenction(conn *Connection) {
+	host := conn.host
+	delete(self.connections, host)
+	delete(self.lastCheckTime, host)
+	delete(self.using, host)
+}
+
+func (self *Hub) Close() {
+	for _, conn := range self.connections {
+		conn.CloseConnection()
+	}
+}
+
 var hub = &Hub{
 	connections:   make(map[string]*Connection),
 	using:         make(map[string]bool),
@@ -94,20 +108,15 @@ var hub = &Hub{
 }
 
 // Connection methods
-func (self *Connection) Read() []byte {
+func (self *Connection) Read() ([]byte, error) {
 	self.ws.SetReadLimit(maxMessageSize)
 	self.ws.SetPongHandler(func(string) error {
 		self.ws.SetReadDeadline(time.Now().Add(pongWait))
-		log.Println("这里应该更新数据")
 		hub.lastCheckTime[self.host] = time.Now()
 		return nil
 	})
 	_, message, err := self.ws.ReadMessage()
-	if err != nil {
-		log.Println(err)
-		return []byte{}
-	}
-	return message
+	return message, err
 }
 
 func (self *Connection) Write(mt int, payload []byte) error {
@@ -124,15 +133,24 @@ func (self *Connection) Send(payload []byte) error {
 }
 
 func (self *Connection) CloseConnection() error {
+	self.closed = true
 	return self.ws.Close()
 }
 
 func (self *Connection) Listen() {
-	for {
-		msg := self.Read()
-		log.Println("这是listen读到的东西 ", string(msg))
+	for !self.closed {
+		msg, err := self.Read()
+		if err != nil {
+			log.Println("出错了, 那么退出这个goroutine吧")
+			self.CloseConnection()
+		}
+		// action
 		self.Write(websocket.TextMessage, []byte(msg))
 	}
+	defer func() {
+		hub.RemoveConenction(self)
+		log.Println("连接关闭", self)
+	}()
 }
 
 func ServeWs(w http.ResponseWriter, r *http.Request) {
@@ -154,8 +172,9 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	// 创建个新连接, 新建一条host记录
 	// 同时开始 listen
-	c := &Connection{ws: ws, host: ip, port: port}
+	c := &Connection{ws: ws, host: ip, port: port, closed: false}
 	hub.AddConnection(c)
 	NewHost(ip, "")
+
 	go c.Listen()
 }

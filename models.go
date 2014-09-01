@@ -70,8 +70,7 @@ func init() {
 	// mysql
 	// TODO 改成参数配置
 	orm.RegisterDataBase("default", "mysql", "root:@/dot?charset=utf8", 30)
-	orm.RegisterModel(new(Application))
-	orm.RegisterModel(new(User))
+	orm.RegisterModel(new(Application), new(User), new(Host))
 	orm.RunSyncdb("default", true, true)
 	db = orm.NewOrm()
 
