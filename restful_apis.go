@@ -42,10 +42,17 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["msg"] = "no such app"
 		// TODO now just for testing
 		task := []byte(name + version)
-		taskqueue.AddTask(&task)
+		taskhub.AddTask(&task)
 	} else {
 		// deploy app
 	}
+	b, _ := JSONEncode(r)
+	io.WriteString(w, b)
+}
+
+func FinishDispatchHandler(w http.ResponseWriter, req *http.Request) {
+	taskhub.FinishOneTask()
+	r := JsonTmpl{"r": 0, "msg": "ok"}
 	b, _ := JSONEncode(r)
 	io.WriteString(w, b)
 }
@@ -55,4 +62,5 @@ func init() {
 	restserver.Get("/hello/:name", http.HandlerFunc(HelloServer))
 	restserver.Post("/app/:app/version/:version", http.HandlerFunc(RegisterApplicationHandler))
 	restserver.Post("/app/:app/version/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
+	restserver.Get("/finish", http.HandlerFunc(FinishDispatchHandler))
 }
