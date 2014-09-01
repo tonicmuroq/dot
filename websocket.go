@@ -36,7 +36,7 @@ type Hub struct {
 }
 
 // Hub methods
-func (self *Hub) checkAlive() {
+func (self *Hub) CheckAlive() {
 	for {
 		for host, last := range self.lastCheckTime {
 			duration := time.Now().Sub(last)
@@ -46,7 +46,7 @@ func (self *Hub) checkAlive() {
 				log.Println(host, " is disconnected.")
 				conn, err := self.connections[host]
 				if err {
-					conn.closeConnection()
+					conn.CloseConnection()
 				}
 				delete(self.connections, host)
 				delete(self.lastCheckTime, host)
@@ -54,20 +54,20 @@ func (self *Hub) checkAlive() {
 			}
 		}
 		for host, conn := range self.connections {
-			conn.ping([]byte(host))
+			conn.Ping([]byte(host))
 		}
 		time.Sleep(checkAliveDuration)
 	}
 }
 
-func (self *Hub) addConnection(conn *Connection) {
+func (self *Hub) AddConnection(conn *Connection) {
 	host := conn.host
 	self.connections[host] = conn
 	self.using[host] = false
 	self.lastCheckTime[host] = time.Now()
 }
 
-func (self *Hub) getConnection(host string) (*Connection, bool) {
+func (self *Hub) GetConnection(host string) (*Connection, bool) {
 	conn, err := self.connections[host]
 	if !err {
 		return nil, false
@@ -80,7 +80,7 @@ func (self *Hub) getConnection(host string) (*Connection, bool) {
 	}
 }
 
-func (self *Hub) putConnection(conn *Connection) {
+func (self *Hub) PutConnection(conn *Connection) {
 	host := conn.host
 	if self.using[host] {
 		self.using[host] = false
@@ -94,7 +94,7 @@ var hub = &Hub{
 }
 
 // Connection methods
-func (self *Connection) read() []byte {
+func (self *Connection) Read() []byte {
 	self.ws.SetReadLimit(maxMessageSize)
 	self.ws.SetPongHandler(func(string) error {
 		self.ws.SetReadDeadline(time.Now().Add(pongWait))
@@ -110,28 +110,28 @@ func (self *Connection) read() []byte {
 	return message
 }
 
-func (self *Connection) write(mt int, payload []byte) error {
+func (self *Connection) Write(mt int, payload []byte) error {
 	self.ws.SetWriteDeadline(time.Now().Add(writeWait))
 	return self.ws.WriteMessage(mt, payload)
 }
 
-func (self *Connection) ping(payload []byte) error {
-	return self.write(websocket.PingMessage, payload)
+func (self *Connection) Ping(payload []byte) error {
+	return self.Write(websocket.PingMessage, payload)
 }
 
-func (self *Connection) send(payload []byte) error {
-	return self.write(websocket.TextMessage, payload)
+func (self *Connection) Send(payload []byte) error {
+	return self.Write(websocket.TextMessage, payload)
 }
 
-func (self *Connection) closeConnection() error {
+func (self *Connection) CloseConnection() error {
 	return self.ws.Close()
 }
 
-func (self *Connection) listen() {
+func (self *Connection) Listen() {
 	for {
-		msg := self.read()
+		msg := self.Read()
 		log.Println("这是listen读到的东西 ", string(msg))
-		self.write(websocket.TextMessage, []byte(msg))
+		self.Write(websocket.TextMessage, []byte(msg))
 	}
 }
 
@@ -155,7 +155,7 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 	// 创建个新连接, 新建一条host记录
 	// 同时开始 listen
 	c := &Connection{ws: ws, host: ip, port: port}
-	hub.addConnection(c)
+	hub.AddConnection(c)
 	NewHost(ip, "")
-	go c.listen()
+	go c.Listen()
 }
