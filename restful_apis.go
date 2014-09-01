@@ -1,11 +1,18 @@
 package main
 
 import (
+	"github.com/bmizerany/pat"
 	"io"
 	"net/http"
 )
 
+var restserver *pat.PatternServeMux
+
 type JsonTmpl map[string]interface{}
+
+func HelloServer(w http.ResponseWriter, req *http.Request) {
+	io.WriteString(w, "hello, ["+req.URL.Query().Get(":name")+"]")
+}
 
 func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
@@ -21,4 +28,10 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	b, _ := JSONEncode(r)
 	io.WriteString(w, b)
+}
+
+func init() {
+	restserver = pat.New()
+	restserver.Get("/hello/:name", http.HandlerFunc(HelloServer))
+	restserver.Post("/app/:app/version/:version", http.HandlerFunc(RegisterApplicationHandler))
 }
