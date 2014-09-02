@@ -38,6 +38,14 @@ type Task struct {
 
 var taskHub *TaskHub
 
+type GroupedTask struct {
+	Name  string
+	Uid   int
+	Id    string
+	Type  int
+	Tasks []Task
+}
+
 // TaskHub
 func (self *TaskHub) GetTask() *Task {
 	return <-self.queue
@@ -80,6 +88,10 @@ func (self *TaskHub) Dispatch() {
 	self.wg.Wait()
 	self.mutex.Unlock()
 	logger.Debug("finish, restart nginx")
+}
+
+func (self *TaskHub) RegroupTasks() *GroupedTask {
+	return nil
 }
 
 func init() {
