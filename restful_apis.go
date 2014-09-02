@@ -1,12 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/bmizerany/pat"
 	"io"
 	"net/http"
 )
 
-var restserver *pat.PatternServeMux
+var restServer *pat.PatternServeMux
 
 type JsonTmpl map[string]interface{}
 
@@ -26,8 +27,8 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "error"
 	}
-	b, _ := JSONEncode(r)
-	io.WriteString(w, b)
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
 }
 
 func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
@@ -46,21 +47,21 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	} else {
 		// deploy app
 	}
-	b, _ := JSONEncode(r)
-	io.WriteString(w, b)
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
 }
 
 func FinishDispatchHandler(w http.ResponseWriter, req *http.Request) {
 	taskhub.FinishOneTask()
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	b, _ := JSONEncode(r)
-	io.WriteString(w, b)
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
 }
 
 func init() {
-	restserver = pat.New()
-	restserver.Get("/hello/:name", http.HandlerFunc(HelloServer))
-	restserver.Post("/app/:app/version/:version", http.HandlerFunc(RegisterApplicationHandler))
-	restserver.Post("/app/:app/version/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
-	restserver.Get("/finish", http.HandlerFunc(FinishDispatchHandler))
+	restServer = pat.New()
+	restServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
+	restServer.Post("/app/:app/version/:version", http.HandlerFunc(RegisterApplicationHandler))
+	restServer.Post("/app/:app/version/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
+	restServer.Get("/finish", http.HandlerFunc(FinishDispatchHandler))
 }
