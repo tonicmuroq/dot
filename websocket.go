@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
+	"github.com/CMGS/websocket"
 	"log"
 	"net/http"
 	"strconv"
