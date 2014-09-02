@@ -2,7 +2,6 @@ package main
 
 import (
 	"code.google.com/p/go-uuid/uuid"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -48,9 +47,9 @@ func (self *TaskHub) GetTask() *Task {
 
 func (self *TaskHub) AddTask(task *Task) {
 	self.queue <- task
-	log.Println(len(self.queue))
+	logger.Debug(len(self.queue))
 	if len(self.queue) >= self.size {
-		log.Println("full, do dispatch")
+		logger.Debug("full, do dispatch")
 		self.Dispatch()
 	}
 }
@@ -63,11 +62,11 @@ func (self *TaskHub) Run() {
 	for {
 		count := len(self.queue)
 		if count > 0 {
-			log.Println("period check")
+			logger.Debug("period check")
 			self.Dispatch()
-			log.Println("period check done")
+			logger.Debug("period check done")
 		} else {
-			log.Println("empty")
+			logger.Debug("empty")
 		}
 		time.Sleep(30 * time.Second)
 	}
@@ -82,7 +81,7 @@ func (self *TaskHub) Dispatch() {
 	}
 	self.wg.Wait()
 	self.mutex.Unlock()
-	log.Println("finish, restart nginx")
+	logger.Debug("finish, restart nginx")
 }
 
 func init() {
