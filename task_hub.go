@@ -74,7 +74,7 @@ func (self *TaskHub) Run() {
 		} else {
 			logger.Debug("empty")
 		}
-		time.Sleep(config.Task.DispatchInterval * time.Second)
+		time.Sleep(time.Duration(config.Task.DispatchInterval) * time.Second)
 	}
 }
 
