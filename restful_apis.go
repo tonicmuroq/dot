@@ -46,14 +46,14 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["msg"] = "no such app"
 	} else {
 		task := AddContainerTask(app, host, false)
-		taskhub.AddTask(task)
+		taskHub.AddTask(task)
 	}
 	encoder := json.NewEncoder(w)
 	encoder.Encode(r)
 }
 
 func FinishDispatchHandler(w http.ResponseWriter, req *http.Request) {
-	taskhub.FinishOneTask()
+	taskHub.FinishOneTask()
 	r := JsonTmpl{"r": 0, "msg": "ok"}
 	encoder := json.NewEncoder(w)
 	encoder.Encode(r)

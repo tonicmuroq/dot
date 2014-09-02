@@ -12,8 +12,6 @@ const (
 	RemoveContainer = 2
 	UpdateContainer = 3
 	BuildImage      = 4
-	Memory          = 1024 * 1024 * 1024
-	Cpus            = 100
 )
 
 type TaskHub struct {
@@ -38,6 +36,8 @@ type Task struct {
 	Container string
 }
 
+var taskHub *TaskHub
+
 type GroupedTask struct {
 	Name  string
 	Uid   int
@@ -45,8 +45,6 @@ type GroupedTask struct {
 	Type  int
 	Tasks []Task
 }
-
-var taskhub *TaskHub
 
 // TaskHub
 func (self *TaskHub) GetTask() *Task {
@@ -76,16 +74,16 @@ func (self *TaskHub) Run() {
 		} else {
 			logger.Debug("empty")
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(time.Duration(config.Task.DispatchInterval) * time.Second)
 	}
 }
 
 func (self *TaskHub) Dispatch() {
 	self.mutex.Lock()
 	count := len(self.queue)
+	self.wg.Add(count)
 	for i := 0; i < count; i = i + 1 {
 		_ = self.GetTask()
-		self.wg.Add(1)
 	}
 	self.wg.Wait()
 	self.mutex.Unlock()
@@ -97,8 +95,12 @@ func (self *TaskHub) RegroupTasks() *GroupedTask {
 }
 
 func init() {
-	// TODO size shall be in arguments
-	taskhub = &TaskHub{queue: make(chan *Task, 5), size: 5, wg: &sync.WaitGroup{}, mutex: &sync.Mutex{}}
+	taskHub = &TaskHub{
+		queue: make(chan *Task, config.Task.QueueSize),
+		size:  config.Task.QueueSize,
+		wg:    &sync.WaitGroup{},
+		mutex: &sync.Mutex{},
+	}
 }
 
 // Task
@@ -134,8 +136,8 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 		Type:    AddContainer,
 		Uid:     app.UserUid(),
 		Bind:    bind,
-		Memory:  Memory,
-		Cpus:    Cpus,
+		Memory:  config.Task.Memory,
+		Cpus:    config.Task.Cpus,
 		Daemon:  daemonId}
 	return &task
 }
@@ -193,8 +195,8 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		Type:      UpdateContainer,
 		Uid:       app.UserUid(),
 		Bind:      bind,
-		Memory:    Memory,
-		Cpus:      Cpus,
+		Memory:    config.Task.Memory,
+		Cpus:      config.Task.Cpus,
 		Daemon:    daemonId,
 		Container: container.ContainerId}
 	return &task
