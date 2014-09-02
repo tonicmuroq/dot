@@ -7,25 +7,16 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	_ "github.com/go-sql-driver/mysql"
 	"path"
+	"sync"
 )
 
 const (
 	appPathPrefix = "/nbe/app/"
 )
 
-// etcdClient
-
 var db orm.Ormer
 var etcdClient *etcd.Client
-
-type Task struct {
-	Uuid        string
-	TaskType    int
-	AppName     string
-	AppVersion  string
-	Host        string
-	ContainerId string
-}
+var portMutex sync.Mutex
 
 type Host struct {
 	Id   int
@@ -34,10 +25,12 @@ type Host struct {
 }
 
 type Container struct {
-	Id         string
-	AppName    string
-	AppVersion string
-	Host       *Host `orm:"ref(fk)"`
+	Id          string
+	Port        int
+	ContainerId string
+	DaemonId    string
+	HostId      int
+	AppId       int
 }
 
 type User struct {
@@ -77,6 +70,9 @@ func init() {
 	// etcd
 	etcdClient = etcd.NewClient([]string{"http://localhost:4001", "http://localhost:4002"})
 	etcdClient.SyncCluster()
+
+	// Mutex
+	portMutex = syncMutex{}
 }
 
 // Application
@@ -84,6 +80,15 @@ func (self *Application) TableUnique() [][]string {
 	return [][]string{
 		[]string{"Name", "Version"},
 	}
+}
+
+func GetApplicationById(appId int) *Application {
+	var app Application
+	err := db.QueryTable(new(Application)).Filter("Id", appId).One(&app)
+	if err != nil {
+		return nil
+	}
+	return &app
 }
 
 func NewApplication(projectname, version, appyaml, configyaml string) *Application {
@@ -191,6 +196,21 @@ func NewHost(ip, name string) *Host {
 	return nil
 }
 
+func GetHostById(hostId int) *Host {
+	var host Host
+	err := db.QueryTable(new(Host)).Filter("Id", hostId).one(&host)
+	if err != nil {
+		return nil
+	}
+	return &host
+}
+
+func (self *Host) Containers() []*Container {
+	var cs []*Container
+	db.QueryTable(new(Container)).Filter("HostId", self.Id).OrderBy("Port").All(&cs)
+	return cs
+}
+
 // Container
 func (self *Container) TableIndex() [][]string {
 	return [][]string{
@@ -200,10 +220,49 @@ func (self *Container) TableIndex() [][]string {
 	}
 }
 
-func NewContainer(app *Application, host *Host) *Container {
-	c := Container{AppName: app.Name, AppVersion: app.Version, Host: host}
+func (self *Container) Application() *Application {
+	return GetApplicationById(self.AppId)
+}
+
+func (self *Container) Host() *Host {
+	return GetHostById(self.HostId)
+}
+
+func NewContainer(app *Application, host *Host, port int, containerId, daemonId string) *Container {
+	c := Container{Port: port, ContainerId: containerId, DaemonId: daemonId, AppId: app.Id, HostId: host.Id}
 	if _, err := db.Insert(&c); err == nil {
 		return &c
 	}
 	return nil
+}
+
+// 获取一个host上的可用的一个端口
+// 如果超出范围就返回0
+// 只允许一个访问
+func GetPortFromHost(host *Host) int {
+	portMutex.Lock()
+	newPort := 49000
+
+	cs := host.Containers()
+	length := len(cs)
+	if length > 0 {
+		var i int
+		for i = 1; i < length; i = i + 1 {
+			tmpPort := cs[0].Port
+			if tmpPort+1 != cs[i].Port {
+				newPort = tmpPort + 1
+				break
+			}
+		}
+		if i == length {
+			newPort = cs[i-1].Port + 1
+		}
+	}
+	portMutex.Unlock()
+
+	if newPort >= 50000 {
+		return 0
+	}
+
+	return newPort
 }
