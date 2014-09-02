@@ -9,7 +9,7 @@ func main() {
 	go hub.CheckAlive()
 	go taskhub.Run()
 
-	http.Handle("/", restserver)
+	http.Handle("/", restServer)
 	http.HandleFunc("/ws", ServeWs)
 
 	err := http.ListenAndServe(":5000", nil)
