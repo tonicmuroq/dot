@@ -35,17 +35,18 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
+	ip := req.Form.Get("host")
+
 	app := GetApplicationByNameAndVersion(name, version)
+	host := GetHostByIp(ip)
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	if app == nil {
+	if app == nil || host == nil {
 		r["r"] = 1
 		r["msg"] = "no such app"
-		// TODO now just for testing
-		task := []byte(name + version)
-		taskhub.AddTask(&task)
 	} else {
-		// deploy app
+		task := AddContainerTask(app, host, false)
+		taskhub.AddTask(task)
 	}
 	encoder := json.NewEncoder(w)
 	encoder.Encode(r)

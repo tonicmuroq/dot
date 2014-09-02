@@ -205,6 +205,15 @@ func GetHostById(hostId int) *Host {
 	return &host
 }
 
+func GetHostByIp(ip string) *Host {
+	var host Host
+	err := db.QueryTable(new(Host)).Filter("Ip", ip).one(&host)
+	if err != nil {
+		return nil
+	}
+	return &host
+}
+
 func (self *Host) Containers() []*Container {
 	var cs []*Container
 	db.QueryTable(new(Container)).Filter("HostId", self.Id).OrderBy("Port").All(&cs)
