@@ -49,6 +49,7 @@ type Application struct {
 type AppYaml struct {
 	Appname string   `json:appname`
 	Runtime string   `json:runtime`
+	Port    int      `json:port`
 	Cmd     []string `json:cmd`
 	Build   []string `json:build`
 }
@@ -74,7 +75,7 @@ func init() {
 	}
 
 	// Mutex
-	portMutex = syncMutex{}
+	portMutex = sync.Mutex{}
 }
 
 // Application
@@ -200,7 +201,7 @@ func NewHost(ip, name string) *Host {
 
 func GetHostById(hostId int) *Host {
 	var host Host
-	err := db.QueryTable(new(Host)).Filter("Id", hostId).one(&host)
+	err := db.QueryTable(new(Host)).Filter("Id", hostId).One(&host)
 	if err != nil {
 		return nil
 	}
@@ -209,7 +210,7 @@ func GetHostById(hostId int) *Host {
 
 func GetHostByIp(ip string) *Host {
 	var host Host
-	err := db.QueryTable(new(Host)).Filter("Ip", ip).one(&host)
+	err := db.QueryTable(new(Host)).Filter("Ip", ip).One(&host)
 	if err != nil {
 		return nil
 	}

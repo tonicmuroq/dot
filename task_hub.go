@@ -18,7 +18,7 @@ const (
 )
 
 type TaskHub struct {
-	queue chan *[]byte
+	queue chan *Task
 	size  int
 	wg    *sync.WaitGroup
 	mutex *sync.Mutex
@@ -77,9 +77,8 @@ func (self *TaskHub) Dispatch() {
 	self.mutex.Lock()
 	count := len(self.queue)
 	for i := 0; i < count; i = i + 1 {
-		d := self.GetTask()
+		_ = self.GetTask()
 		self.wg.Add(1)
-		log.Println(string(*d))
 	}
 	self.wg.Wait()
 	self.mutex.Unlock()
@@ -93,33 +92,37 @@ func init() {
 
 // Task
 func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
-	var port int
+	var bind int
 	var daemonId string
 	if daemon {
-		port = 0
+		bind = 0
 		daemonId = uuid.New()
 	} else {
-		port = GetPortFromHost(host)
+		bind = GetPortFromHost(host)
 		daemonId = ""
 		// 没有可以用的端口了
-		if port == 0 {
+		if bind == 0 {
 			return nil
 		}
 	}
 
-	appYaml := app.GetAppYaml()
+	appYaml, err := app.GetAppYaml()
+	if err != nil {
+		return nil
+	}
 	cmdString := appYaml.Cmd[0]
 	cmd := strings.Split(cmdString, " ")
+	port := appYaml.Port
 
 	task := Task{
 		Name:    strings.ToLower(app.Name),
 		Version: app.Version,
-		Port:    app.Port,
+		Port:    port,
 		Cmd:     cmd,
 		Host:    host.Ip,
 		Type:    AddContainer,
 		Uid:     app.UserUid(),
-		Bind:    port,
+		Bind:    bind,
 		Memory:  Memory,
 		Cpus:    Cpus,
 		Daemon:  daemonId}
@@ -148,33 +151,37 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		return nil
 	}
 
-	var port int
+	var bind int
 	var daemonId string
 	if container.DaemonId != "" {
-		port = 0
+		bind = 0
 		daemonId = uuid.New()
 	} else {
-		port = GetPortFromHost(host)
+		bind = GetPortFromHost(host)
 		// 不够端口玩了
-		if port == 0 {
+		if bind == 0 {
 			return nil
 		}
 		daemonId = ""
 	}
 
-	appYaml := app.GetAppYaml()
+	appYaml, err := app.GetAppYaml()
+	if err != nil {
+		return nil
+	}
 	cmdString := appYaml.Cmd[0]
 	cmd := strings.Split(cmdString, " ")
+	port := appYaml.Port
 
 	task := Task{
 		Name:      strings.ToLower(app.Name),
 		Version:   app.Version,
-		Port:      app.Port,
+		Port:      port,
 		Cmd:       cmd,
 		Host:      host.Ip,
 		Type:      UpdateContainer,
 		Uid:       app.UserUid(),
-		Bind:      port,
+		Bind:      bind,
 		Memory:    Memory,
 		Cpus:      Cpus,
 		Daemon:    daemonId,
