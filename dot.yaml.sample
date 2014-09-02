@@ -1,0 +1,11 @@
+bind: "localhost:5000"
+pidfile: "/var/run/dot.pid"
+db:
+    name: "default"
+    use: "mysql"
+    url: "root:@/dot?charset=utf8"
+etcd:
+    sync: true
+    machines:
+        - "127.0.0.1:4001"
+        - "127.0.0.1:4002"

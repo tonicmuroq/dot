@@ -48,3 +48,7 @@ func LoadConfig() {
 	}
 	logger.Debug(config)
 }
+
+func init() {
+	LoadConfig()
+}
