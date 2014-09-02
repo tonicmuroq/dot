@@ -62,14 +62,16 @@ type ConfigYaml map[string]interface{}
 func init() {
 	// mysql
 	// TODO 改成参数配置
-	orm.RegisterDataBase("default", "mysql", "root:@/dot?charset=utf8", 30)
+	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
 	orm.RegisterModel(new(Application), new(User), new(Host))
-	orm.RunSyncdb("default", true, true)
+	orm.RunSyncdb(config.Db.Name, true, true)
 	db = orm.NewOrm()
 
 	// etcd
-	etcdClient = etcd.NewClient([]string{"http://localhost:4001", "http://localhost:4002"})
-	etcdClient.SyncCluster()
+	etcdClient = etcd.NewClient(config.Etcd.Machines)
+	if config.Etcd.Sync {
+		etcdClient.SyncCluster()
+	}
 
 	// Mutex
 	portMutex = syncMutex{}
@@ -134,7 +136,7 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 }
 
 func (self *Application) GetYamlPath(cpath string) string {
-	return path.Join(appPathPrefix, self.Name, self.Version, cpath+".yaml")
+	return path.Join(appPathPrefix, self.Name, self.Version, fmt.Sprintf("%s.yaml", cpath))
 }
 
 func (self *Application) GetAppYaml() (*AppYaml, error) {
