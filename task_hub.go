@@ -38,6 +38,14 @@ type Task struct {
 	Container string
 }
 
+type GroupedTask struct {
+	Name  string
+	Uid   int
+	Id    string
+	Type  int
+	Tasks []Task
+}
+
 var taskhub *TaskHub
 
 // TaskHub
@@ -82,6 +90,10 @@ func (self *TaskHub) Dispatch() {
 	self.wg.Wait()
 	self.mutex.Unlock()
 	logger.Debug("finish, restart nginx")
+}
+
+func (self *TaskHub) RegroupTasks() *GroupedTask {
+	return nil
 }
 
 func init() {
