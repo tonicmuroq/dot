@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -12,8 +11,8 @@ func main() {
 	http.Handle("/", restServer)
 	http.HandleFunc("/ws", ServeWs)
 
-	err := http.ListenAndServe(":5000", nil)
+	err := http.ListenAndServe(config.Bind, nil)
 	if err != nil {
-		log.Fatal("err")
+		logger.Assert(err, "http")
 	}
 }

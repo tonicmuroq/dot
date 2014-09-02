@@ -35,10 +35,9 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
-	app := GetApplicationByNameAndVersion(name, version)
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	if app == nil {
+	if app := GetApplicationByNameAndVersion(name, version); app == nil {
 		r["r"] = 1
 		r["msg"] = "no such app"
 		// TODO now just for testing
