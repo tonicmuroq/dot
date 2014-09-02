@@ -18,12 +18,20 @@ type EtcdConfig struct {
 	Machines []string
 }
 
+type TaskConfig struct {
+	DispatchInterval int
+	QueueSize        int
+	Memory           int
+	Cpus             int
+}
+
 type DotConfig struct {
 	Bind    string
 	PidFile string
 
 	Db   DbConfig
 	Etcd EtcdConfig
+	Task TaskConfig
 }
 
 var config = DotConfig{}
