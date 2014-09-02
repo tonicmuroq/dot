@@ -74,7 +74,7 @@ func (self *TaskHub) Run() {
 		} else {
 			logger.Debug("empty")
 		}
-		time.Sleep(time.Duration(config.Task.DispatchInterval) * time.Second)
+		time.Sleep(time.Duration(config.Task.Dispatch) * time.Second)
 	}
 }
 
@@ -96,8 +96,8 @@ func (self *TaskHub) RegroupTasks() *GroupedTask {
 
 func init() {
 	taskHub = &TaskHub{
-		queue: make(chan *Task, config.Task.QueueSize),
-		size:  config.Task.QueueSize,
+		queue: make(chan *Task, config.Task.Queuesize),
+		size:  config.Task.Queuesize,
 		wg:    &sync.WaitGroup{},
 		mutex: &sync.Mutex{},
 	}
