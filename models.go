@@ -25,7 +25,7 @@ type Host struct {
 }
 
 type Container struct {
-	Id          string
+	Id          int
 	Port        int
 	ContainerId string
 	DaemonId    string
@@ -64,7 +64,7 @@ func init() {
 	// mysql
 	// TODO 改成参数配置
 	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
-	orm.RegisterModel(new(Application), new(User), new(Host))
+	orm.RegisterModel(new(Application), new(User), new(Host), new(Container))
 	orm.RunSyncdb(config.Db.Name, true, true)
 	db = orm.NewOrm()
 
@@ -76,6 +76,9 @@ func init() {
 
 	// Mutex
 	portMutex = sync.Mutex{}
+
+	NewApplication("projectname", "12345", `{"appname": "test", "runtime": "python", "port": 5000, "cmd": ["pip install"]}`, "")
+	NewHost("127.0.0.1", "tonic")
 }
 
 // Application

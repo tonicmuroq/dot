@@ -92,6 +92,7 @@ func (self *Levi) Run() {
 			if err := self.conn.ws.ReadJSON(&taskReply); err == nil {
 				// do
 				// 保存 container 之类的
+				logger.Debug(taskReply)
 				for taskUuid, taskReplies := range taskReply {
 					if tasks, exists := self.waiting[taskUuid]; exists {
 						if len(tasks) != len(taskReplies) {
