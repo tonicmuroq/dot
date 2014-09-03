@@ -122,7 +122,7 @@ func (self *Connection) Listen() {
 			log.Println("出错了, 那么退出这个goroutine吧")
 			self.CloseConnection()
 		}
-		// action
+		// TODO action
 		self.Write(websocket.TextMessage, []byte(msg))
 	}
 	defer func() {
@@ -157,6 +157,5 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 	hub.AddLevi(levi)
 	NewHost(ip, "")
 
-	go c.Listen()
 	go levi.Run()
 }

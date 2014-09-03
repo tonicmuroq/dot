@@ -46,6 +46,8 @@ type GroupedTask struct {
 	Tasks []Task
 }
 
+type TaskReply map[string]interface{}
+
 // TaskHub
 func (self *TaskHub) GetTask() *Task {
 	return <-self.queue
