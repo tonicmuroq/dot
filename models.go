@@ -240,12 +240,28 @@ func (self *Container) Host() *Host {
 	return GetHostById(self.HostId)
 }
 
+func (self *Container) Delete() bool {
+	if _, err := db.Delete(&Container{Id: self.Id}); err == nil {
+		return true
+	}
+	return false
+}
+
 func NewContainer(app *Application, host *Host, port int, containerId, daemonId string) *Container {
 	c := Container{Port: port, ContainerId: containerId, DaemonId: daemonId, AppId: app.Id, HostId: host.Id}
 	if _, err := db.Insert(&c); err == nil {
 		return &c
 	}
 	return nil
+}
+
+func GetContainerByCid(cid string) *Container {
+	var container Container
+	err := db.QueryTable(new(Container)).Filter("ContainerId", cid).One(&container)
+	if err != nil {
+		return nil
+	}
+	return &container
 }
 
 // 获取一个host上的可用的一个端口

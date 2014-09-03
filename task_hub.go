@@ -46,7 +46,7 @@ type GroupedTask struct {
 	Tasks []Task
 }
 
-type TaskReply map[string]interface{}
+type TaskReply map[string][]interface{}
 
 // TaskHub
 func (self *TaskHub) GetTask() *Task {

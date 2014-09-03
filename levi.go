@@ -92,6 +92,47 @@ func (self *Levi) Run() {
 			if err := self.conn.ws.ReadJSON(&taskReply); err == nil {
 				// do
 				// 保存 container 之类的
+				for taskUuid, taskReplies := range taskReply {
+					if tasks, exists := self.waiting[taskUuid]; exists {
+						if len(tasks) != len(taskReplies) {
+							logger.Debug("长度不对啊这")
+							continue
+						}
+						for i := 0; i < len(tasks); i = i + 1 {
+							task := tasks[i]
+							retval := taskReplies[i]
+							switch task.Type {
+							case AddContainer:
+								app := GetApplicationByNameAndVersion(task.Name, task.Version)
+								host := GetHostByIp(task.Host)
+								if app == nil || host == nil {
+									logger.Info("app/host 没了")
+									continue
+								}
+								NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
+							case RemoveContainer:
+								old := GetContainerByCid(task.Container)
+								if old == nil {
+									logger.Info("要删的容器已经不在了")
+									continue
+								}
+								old.Delete()
+							case UpdateContainer:
+								old := GetContainerByCid(task.Container)
+								if old != nil {
+									old.Delete()
+								}
+								app := GetApplicationByNameAndVersion(task.Name, task.Version)
+								host := GetHostByIp(task.Host)
+								if app == nil || host == nil {
+									logger.Info("app/host 没了")
+									continue
+								}
+								NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
+							}
+						}
+					}
+				}
 			} else {
 				logger.Debug("出错了, 关闭连接退出goroutine")
 				self.conn.CloseConnection()
