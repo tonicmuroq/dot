@@ -10,9 +10,10 @@ import (
 
 type Levi struct {
 	conn    *Connection
+	inTask  chan *Task
+	closed  chan bool
 	host    string
 	size    int
-	closed  bool
 	tasks   map[string][]Task
 	waiting map[string][]Task
 }
@@ -21,16 +22,28 @@ func NewLevi(conn *Connection, size int) *Levi {
 	return &Levi{conn, conn.host, size, false, make(map[string][]Task), make(map[string][]Task)}
 }
 
-func (self *Levi) AddTask(task *Task) {
-	key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
-	if _, exists := self.tasks[key]; exists {
-		self.tasks[key] = append(self.tasks[key], *task)
-	} else {
-		self.tasks[key] = []Task{}
-	}
-	if self.Len() >= self.size {
-		logger.Debug("full check")
-		self.SendTasks()
+func (self *Levi) WaitTask() {
+	for {
+		select {
+		case task := <-inTask:
+			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
+			if _, exists := self.tasks[key]; exists {
+				self.tasks[key] = append(self.tasks[key], *task)
+			} else {
+				self.tasks[key] = []Task{}
+			}
+			if self.Len() >= self.size {
+				logger.Debug("full check")
+				self.SendTasks()
+			}
+		case <-self.closed:
+			break
+		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
+			if self.Len() != 0 {
+				logger.Debug("full check")
+				self.SendTasks()
+			}
+		}
 	}
 }
 
@@ -67,7 +80,7 @@ func (self *Levi) SendTasks() {
 
 func (self *Levi) Close() {
 	self.conn.CloseConnection()
-	self.closed = true
+	self.closed <- true
 	self.tasks = make(map[string][]Task)
 }
 
