@@ -31,8 +31,7 @@ type Connection struct {
 
 // 保存所有连接, 定时 ping
 type Hub struct {
-	connections   map[string]*Connection
-	using         map[string]bool
+	levis         map[string]*Levi
 	lastCheckTime map[string]time.Time
 }
 
@@ -45,65 +44,44 @@ func (self *Hub) CheckAlive() {
 			// 如果一个连接不再存在, 那么先关闭连接, 再删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
 				log.Println(host, " is disconnected.")
-				conn, err := self.connections[host]
-				if err {
-					conn.CloseConnection()
+				levi, exists := self.levis[host]
+				if exists {
+					levi.Close()
 				}
-				delete(self.connections, host)
+				delete(self.levis, host)
 				delete(self.lastCheckTime, host)
-				delete(self.using, host)
 			}
 		}
-		for host, conn := range self.connections {
-			conn.Ping([]byte(host))
+		for host, levi := range self.levis {
+			levi.conn.Ping([]byte(host))
 		}
 		time.Sleep(checkAliveDuration)
 	}
 }
 
-func (self *Hub) AddConnection(conn *Connection) {
-	host := conn.host
-	self.connections[host] = conn
-	self.using[host] = false
+func (self *Hub) AddLevi(levi *Levi) {
+	host := levi.host
+	self.levis[host] = levi
 	self.lastCheckTime[host] = time.Now()
 }
 
-func (self *Hub) GetConnection(host string) (*Connection, bool) {
-	conn, err := self.connections[host]
-	if !err {
-		return nil, false
-	}
-	if !self.using[host] {
-		self.using[host] = true
-		return conn, true
-	} else {
-		return nil, false
-	}
+func (self *Hub) GetLevi(host string) *Levi {
+	return self.levis[host]
 }
 
-func (self *Hub) PutConnection(conn *Connection) {
-	host := conn.host
-	if self.using[host] {
-		self.using[host] = false
-	}
-}
-
-func (self *Hub) RemoveConenction(conn *Connection) {
-	host := conn.host
-	delete(self.connections, host)
+func (self *Hub) RemoveLevi(host string) {
+	delete(self.levis, host)
 	delete(self.lastCheckTime, host)
-	delete(self.using, host)
 }
 
 func (self *Hub) Close() {
-	for _, conn := range self.connections {
-		conn.CloseConnection()
+	for _, levi := range self.levis {
+		levi.Close()
 	}
 }
 
 var hub = &Hub{
-	connections:   make(map[string]*Connection),
-	using:         make(map[string]bool),
+	levis:         make(map[string]*Levi),
 	lastCheckTime: make(map[string]time.Time),
 }
 
@@ -144,11 +122,13 @@ func (self *Connection) Listen() {
 			log.Println("出错了, 那么退出这个goroutine吧")
 			self.CloseConnection()
 		}
-		// action
+		// TODO action
 		self.Write(websocket.TextMessage, []byte(msg))
 	}
 	defer func() {
-		hub.RemoveConenction(self)
+		levi := hub.GetLevi(self.host)
+		levi.Close()
+		hub.RemoveLevi(self.host)
 		log.Println("连接关闭", self)
 	}()
 }
@@ -173,8 +153,9 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 	// 创建个新连接, 新建一条host记录
 	// 同时开始 listen
 	c := &Connection{ws: ws, host: ip, port: port, closed: false}
-	hub.AddConnection(c)
+	levi := NewLevi(c, config.Task.Queuesize)
+	hub.AddLevi(levi)
 	NewHost(ip, "")
 
-	go c.Listen()
+	go levi.Run()
 }

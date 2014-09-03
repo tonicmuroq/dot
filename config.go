@@ -19,15 +19,15 @@ type EtcdConfig struct {
 }
 
 type TaskConfig struct {
-	DispatchInterval int
-	QueueSize        int
-	Memory           int
-	Cpus             int
+	Dispatch  int
+	Queuesize int
+	Memory    int
+	Cpus      int
 }
 
 type DotConfig struct {
 	Bind    string
-	PidFile string
+	Pidfile string
 
 	Db   DbConfig
 	Etcd EtcdConfig
