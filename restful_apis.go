@@ -38,7 +38,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	ip := req.Form.Get("host")
 
 	app := GetApplicationByNameAndVersion(name, version)
-	host := GetHostByIp(ip)
+	host := GetHostByIP(ip)
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
 	if app == nil || host == nil {

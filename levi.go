@@ -34,13 +34,12 @@ func NewLevi(conn *Connection, size int) *Levi {
 
 func (self *Levi) WaitTask() {
 	defer self.wg.Done()
-	for {
+	finish := false
+	for !finish {
 		select {
 		case task := <-self.inTask:
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
-			if _, exists := self.tasks[key]; exists {
-				self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
-			} else {
+			if _, exists := self.tasks[key]; !exists {
 				self.tasks[key] = &GroupedTask{
 					Name:  task.Name,
 					Uid:   task.Uid,
@@ -49,6 +48,7 @@ func (self *Levi) WaitTask() {
 					Tasks: []*Task{},
 				}
 			}
+			self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
 			if self.Len() >= self.size {
 				logger.Debug("send tasks")
 				self.SendTasks()
@@ -58,8 +58,9 @@ func (self *Levi) WaitTask() {
 				logger.Debug("send tasks")
 				self.SendTasks()
 			}
-			break
+			finish = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
+			logger.Debug("time check ", self.Len())
 			if self.Len() != 0 {
 				logger.Debug("send tasks")
 				self.SendTasks()
@@ -106,7 +107,7 @@ func (self *Levi) Run() {
 				self.conn.CloseConnection()
 			}
 		case err == nil:
-			logger.Debug(taskReply)
+			logger.Debug("taskReply", taskReply)
 			for taskUUID, taskReplies := range taskReply {
 				tasks, exists := self.waiting[taskUUID]
 				if !exists || (exists && len(tasks) != len(taskReplies)) {
@@ -118,7 +119,7 @@ func (self *Levi) Run() {
 					switch task.Type {
 					case AddContainer:
 						app := GetApplicationByNameAndVersion(task.Name, task.Version)
-						host := GetHostByIp(task.Host)
+						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
 							continue
@@ -137,7 +138,7 @@ func (self *Levi) Run() {
 							old.Delete()
 						}
 						app := GetApplicationByNameAndVersion(task.Name, task.Version)
-						host := GetHostByIp(task.Host)
+						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
 							continue
