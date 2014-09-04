@@ -146,6 +146,7 @@ func (self *Levi) Run() {
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
 					}
 				}
+				self.waiting[taskUUID] = make(map[string][]*Task)
 			}
 		}
 	}

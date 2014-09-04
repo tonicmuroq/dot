@@ -33,6 +33,9 @@ type Connection struct {
 type Hub struct {
 	levis         map[string]*Levi
 	lastCheckTime map[string]time.Time
+	appIds        []int
+	done          chan int
+	closed        chan bool
 }
 
 // Hub methods
@@ -51,6 +54,28 @@ func (self *Hub) CheckAlive() {
 			levi.conn.Ping([]byte(host))
 		}
 		time.Sleep(checkAliveDuration)
+	}
+}
+
+func (self *Hub) Run() {
+	finish := false
+	for !finish {
+		select {
+		case appId := <-self.done:
+			self.appIds = append(self.appIds, appId)
+			if len(self.appIds) >= self.size {
+				logger.Debug("restart nginx")
+			}
+		case <-self.closed:
+			if len(self.appIds) != 0 {
+				logger.Debug("restart nginx")
+			}
+			finish = true
+		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
+			if len(self.appIds) != 0 {
+				logger.Debug("restart nginx")
+			}
+		}
 	}
 }
 
@@ -78,6 +103,7 @@ func (self *Hub) Close() {
 	for _, levi := range self.levis {
 		levi.Close()
 	}
+	self.closed <- true
 }
 
 func (self *Hub) Dispatch(host string, task *Task) {
@@ -92,6 +118,9 @@ func (self *Hub) Dispatch(host string, task *Task) {
 var hub = &Hub{
 	levis:         make(map[string]*Levi),
 	lastCheckTime: make(map[string]time.Time),
+	appIds:        []int{},
+	done:          make(chan int),
+	closed:        make(chan bool),
 }
 
 func (self *Connection) Init() {
