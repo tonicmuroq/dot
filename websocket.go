@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/CMGS/websocket"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,6 +35,7 @@ type Hub struct {
 	appIds        []int
 	done          chan int
 	closed        chan bool
+	size          int
 }
 
 // Hub methods
@@ -64,19 +64,23 @@ func (self *Hub) Run() {
 		case appId := <-self.done:
 			self.appIds = append(self.appIds, appId)
 			if len(self.appIds) >= self.size {
-				logger.Debug("restart nginx")
+				logger.Info("restart nginx")
 			}
 		case <-self.closed:
 			if len(self.appIds) != 0 {
-				logger.Debug("restart nginx")
+				logger.Info("restart nginx")
 			}
 			finish = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
 			if len(self.appIds) != 0 {
-				logger.Debug("restart nginx")
+				logger.Info("restart nginx")
 			}
 		}
 	}
+}
+
+func (self *Hub) RestartNginx() {
+	self.appIds = []int{}
 }
 
 func (self *Hub) AddLevi(levi *Levi) {
@@ -90,8 +94,8 @@ func (self *Hub) GetLevi(host string) *Levi {
 }
 
 func (self *Hub) RemoveLevi(host string) {
-	levi, ok := self.GetLevi(host)
-	if !ok {
+	levi, ok := self.levis[host]
+	if !ok || levi == nil {
 		return
 	}
 	levi.Close()
@@ -107,9 +111,9 @@ func (self *Hub) Close() {
 }
 
 func (self *Hub) Dispatch(host string, task *Task) {
-	levi, ok := self.GetLevi(host)
-	if !ok {
-		logger.Info("Not exists")
+	levi, ok := self.levis[host]
+	if !ok || levi == nil {
+		logger.Info("Not existed")
 		return
 	}
 	levi.inTask <- task
@@ -121,6 +125,7 @@ var hub = &Hub{
 	appIds:        []int{},
 	done:          make(chan int),
 	closed:        make(chan bool),
+	size:          5,
 }
 
 func (self *Connection) Init() {

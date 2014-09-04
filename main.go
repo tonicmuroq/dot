@@ -6,6 +6,7 @@ import (
 
 func main() {
 	go hub.CheckAlive()
+	go hub.Run()
 
 	http.Handle("/", restServer)
 	http.HandleFunc("/ws", ServeWs)
