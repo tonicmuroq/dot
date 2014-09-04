@@ -46,8 +46,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["msg"] = "no such app"
 	} else {
 		task := AddContainerTask(app, host, false)
-		levi := hub.GetLevi(host.Ip)
-		levi.inTask <- task
+		hub.Dispatch(host.Ip, task)
 	}
 	encoder := json.NewEncoder(w)
 	encoder.Encode(r)
