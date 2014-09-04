@@ -119,7 +119,7 @@ func (self *Levi) Run() {
 					switch task.Type {
 					case AddContainer:
 						app := GetApplicationByNameAndVersion(task.Name, task.Version)
-						host := GetHostByIp(task.Host)
+						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
 							continue
@@ -138,7 +138,7 @@ func (self *Levi) Run() {
 							old.Delete()
 						}
 						app := GetApplicationByNameAndVersion(task.Name, task.Version)
-						host := GetHostByIp(task.Host)
+						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
 							continue

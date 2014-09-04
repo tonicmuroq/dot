@@ -20,7 +20,7 @@ var portMutex sync.Mutex
 
 type Host struct {
 	Id   int
-	Ip   string
+	IP   string `orm:"column(ip)"`
 	Name string
 }
 
@@ -208,13 +208,13 @@ func (self *User) TableUnique() [][]string {
 // Host
 func (self *Host) TableUnique() [][]string {
 	return [][]string{
-		[]string{"Ip"},
+		[]string{"IP"},
 	}
 }
 
 func NewHost(ip, name string) *Host {
-	host := Host{Ip: ip, Name: name}
-	if _, id, err := db.ReadOrCreate(&host, "Ip"); err == nil {
+	host := Host{IP: ip, Name: name}
+	if _, id, err := db.ReadOrCreate(&host, "IP"); err == nil {
 		host.Id = int(id)
 		return &host
 	}
@@ -230,9 +230,9 @@ func GetHostById(hostId int) *Host {
 	return &host
 }
 
-func GetHostByIp(ip string) *Host {
+func GetHostByIP(ip string) *Host {
 	var host Host
-	err := db.QueryTable(new(Host)).Filter("Ip", ip).One(&host)
+	err := db.QueryTable(new(Host)).Filter("IP", ip).One(&host)
 	if err != nil {
 		return nil
 	}

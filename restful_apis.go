@@ -38,7 +38,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	ip := req.Form.Get("host")
 
 	app := GetApplicationByNameAndVersion(name, version)
-	host := GetHostByIp(ip)
+	host := GetHostByIP(ip)
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
 	if app == nil || host == nil {
@@ -46,7 +46,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["msg"] = "no such app"
 	} else {
 		task := AddContainerTask(app, host, false)
-		levi := hub.GetLevi(host.Ip)
+		levi := hub.GetLevi(host.IP)
 		if levi == nil || task == nil {
 			r["r"] = 1
 			r["msg"] = "host is not connected"

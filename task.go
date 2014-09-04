@@ -66,7 +66,7 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 		Version: app.Version,
 		Port:    port,
 		Cmd:     cmd,
-		Host:    host.Ip,
+		Host:    host.IP,
 		Type:    AddContainer,
 		Uid:     app.UserUid(),
 		Bind:    bind,
@@ -85,7 +85,7 @@ func RemoveContainerTask(container *Container) *Task {
 	task := Task{
 		Name:      strings.ToLower(app.Name),
 		Version:   app.Version,
-		Host:      host.Ip,
+		Host:      host.IP,
 		Type:      RemoveContainer,
 		Uid:       0,
 		Container: container.ContainerId}
@@ -125,7 +125,7 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		Version:   app.Version,
 		Port:      port,
 		Cmd:       cmd,
-		Host:      host.Ip,
+		Host:      host.IP,
 		Type:      UpdateContainer,
 		Uid:       app.UserUid(),
 		Bind:      bind,
