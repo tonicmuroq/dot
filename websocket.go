@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/CMGS/websocket"
 	"log"
 	"net/http"
@@ -80,13 +81,13 @@ func (self *Hub) Close() {
 	}
 }
 
-func (self *Hub) Dispatch(host string, task *Task) {
+func (self *Hub) Dispatch(host string, task *Task) error {
 	levi, ok := self.GetLevi(host)
 	if !ok {
-		logger.Info("Not exists")
-		return
+		return errors.New(fmt.Sprintf("%s levi not exists", host))
 	}
 	levi.inTask <- task
+	return nil
 }
 
 var hub = &Hub{
