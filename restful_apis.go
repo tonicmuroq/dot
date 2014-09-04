@@ -47,7 +47,12 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	} else {
 		task := AddContainerTask(app, host, false)
 		levi := hub.GetLevi(host.Ip)
-		levi.inTask <- task
+		if levi == nil || task == nil {
+			r["r"] = 1
+			r["msg"] = "host is not connected"
+		} else {
+			levi.inTask <- task
+		}
 	}
 	encoder := json.NewEncoder(w)
 	encoder.Encode(r)

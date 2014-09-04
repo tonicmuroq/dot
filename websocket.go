@@ -158,4 +158,5 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 	NewHost(ip, "")
 
 	go levi.Run()
+	go levi.WaitTask()
 }
