@@ -43,7 +43,7 @@ type GroupedTask struct {
 	Uid   int
 	Id    string
 	Type  int
-	Tasks []Task
+	Tasks []*Task
 }
 
 type TaskReply map[string][]interface{}
