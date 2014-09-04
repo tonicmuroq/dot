@@ -41,18 +41,18 @@ func (self *Levi) WaitTask() {
 					Tasks: make([]*Tasks),
 				}
 			}
-			if len(self.tasks) >= self.size {
+			if self.Len() >= self.size {
 				logger.Debug("send tasks")
 				self.SendTasks()
 			}
 		case <-self.closed:
-			if len(self.tasks) != 0 {
+			if self.Len() != 0 {
 				logger.Debug("send tasks")
 				self.SendTasks()
 			}
 			break
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
-			if len(self.tasks) != 0 {
+			if self.Len() != 0 {
 				logger.Debug("send tasks")
 				self.SendTasks()
 			}
@@ -139,4 +139,12 @@ func (self *Levi) Run() {
 			}
 		}
 	}
+}
+
+func (self *Levi) Len() int {
+	count := 0
+	for _, value := range self.tasks {
+		count = count + len(value)
+	}
+	return count
 }
