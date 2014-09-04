@@ -41,6 +41,7 @@ func EnsureDir(path string, owner, group int) error {
 
 func EnsureFile(path string, owner, group int, content []byte) error {
 	file, err := os.Create(path)
+	defer file.Close()
 	if err != nil {
 		return nil
 	}
