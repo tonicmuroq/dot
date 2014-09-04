@@ -37,7 +37,11 @@ func (self *Levi) WaitTask() {
 	finish := false
 	for !finish {
 		select {
-		case task := <-self.inTask:
+		case task, ok := <-self.inTask:
+			if !ok {
+				finish = true
+				break
+			}
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
 			if _, exists := self.tasks[key]; !exists {
 				self.tasks[key] = &GroupedTask{
@@ -71,7 +75,9 @@ func (self *Levi) WaitTask() {
 
 func (self *Levi) Close() {
 	self.wg.Add(1)
+	close(self.inTask)
 	self.closed <- true
+	close(self.closed)
 	self.wg.Wait()
 	self.conn.CloseConnection()
 }
