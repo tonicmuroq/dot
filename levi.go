@@ -17,11 +17,11 @@ type Levi struct {
 	size    int
 	tasks   map[string]*GroupedTask
 	waiting map[string][]*Task
-	wg      sync.WaitGroup
+	wg      *sync.WaitGroup
 }
 
 func NewLevi(conn *Connection, size int) *Levi {
-	return &Levi{conn, conn.host, size, false, make(map[string]*GroupedTask), make(map[string][]*Task), sync.WaitGroup{}}
+	return &Levi{conn, conn.host, size, false, make(map[string]*GroupedTask), make(map[string][]*Task), &sync.WaitGroup{}}
 }
 
 func (self *Levi) WaitTask() {
