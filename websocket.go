@@ -94,15 +94,6 @@ var hub = &Hub{
 	lastCheckTime: make(map[string]time.Time),
 }
 
-func (self *Connection) Init() {
-	self.ws.SetReadLimit(maxMessageSize)
-	self.ws.SetPongHandler(func(string) error {
-		self.ws.SetReadDeadline(time.Now().Add(pongWait))
-		hub.lastCheckTime[self.host] = time.Now()
-		return nil
-	})
-}
-
 // Connection methods
 func (self *Connection) Read() ([]byte, error) {
 	_, message, err := self.ws.ReadMessage()
@@ -140,6 +131,17 @@ func (self *Connection) Listen() {
 	}
 }
 
+func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
+	ws.SetReadLimit(maxMessageSize)
+	ws.SetPongHandler(func(string) error {
+		ws.SetReadDeadline(time.Now().Add(pongWait))
+		hub.lastCheckTime[c.host] = time.Now()
+		return nil
+	})
+	c := &Connection{ws: ws, host: ip, port: port, closed: false}
+	return c
+}
+
 func ServeWs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
@@ -159,8 +161,7 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	// 创建个新连接, 新建一条host记录
 	// 同时开始 listen
-	c := &Connection{ws: ws, host: ip, port: port, closed: false}
-	c.Init()
+	c := NewConnection(ws, ip, port)
 	levi := NewLevi(c, config.Task.Queuesize)
 	hub.AddLevi(levi)
 	NewHost(ip, "")
