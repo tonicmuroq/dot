@@ -77,8 +77,11 @@ func init() {
 	// Mutex
 	portMutex = sync.Mutex{}
 
-	NewApplication("projectname", "12345", `{"appname": "test", "runtime": "python", "port": 5000, "cmd": ["pip install"]}`, "")
-	NewHost("127.0.0.1", "tonic")
+	app := NewApplication("projectname", "12345", `{"appname": "test", "runtime": "python", "port": 5000, "cmd": ["pip install"]}`, "")
+	host := NewHost("127.0.0.1", "tonic")
+	NewContainer(app, host, 12345, "12345", "")
+	NewContainer(app, host, 12346, "12345", "")
+	NewContainer(app, host, 12347, "12345", "")
 }
 
 // Application
@@ -104,7 +107,6 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	}
 	var appYamlJson AppYaml
 	if err := JSONDecode(appyaml, &appYamlJson); err != nil {
-		fmt.Println("app.yaml ", err, appyaml)
 		return nil
 	}
 
@@ -177,6 +179,23 @@ func (self *Application) GetConfigYaml() (*ConfigYaml, error) {
 
 func (self *Application) UserUid() int {
 	return self.User.Id
+}
+
+func (self *Application) Containers() []*Container {
+	var cs []*Container
+	db.QueryTable(new(Container)).Filter("AppId", self.Id).OrderBy("Port").All(&cs)
+	return cs
+}
+
+func (self *Application) Hosts() []*Host {
+	var rs orm.ParamsList
+	var hosts []*Host
+	_, err := db.Raw("SELECT distinct(host_id) FROM container WHERE app_id=?", self.Id).ValuesFlat(&rs)
+	if err != nil {
+		return hosts
+	}
+	db.QueryTable(new(Host)).Filter("id__in", rs).All(&hosts)
+	return hosts
 }
 
 // User

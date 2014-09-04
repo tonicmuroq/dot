@@ -47,7 +47,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	} else {
 		task := AddContainerTask(app, host, false)
 		levi := hub.GetLevi(host.Ip)
-		levi.AddTask(task)
+		levi.inTask <- task
 	}
 	encoder := json.NewEncoder(w)
 	encoder.Encode(r)

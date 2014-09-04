@@ -3,8 +3,7 @@ package main
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"fmt"
-	"strconv"
-	"strings"
+	"net"
 	"sync"
 	"time"
 )
@@ -21,24 +20,33 @@ type Levi struct {
 }
 
 func NewLevi(conn *Connection, size int) *Levi {
-	return &Levi{conn, conn.host, size, false, make(map[string]*GroupedTask), make(map[string][]*Task), &sync.WaitGroup{}}
+	return &Levi{
+		conn:    conn,
+		inTask:  make(chan *Task),
+		closed:  make(chan bool),
+		host:    conn.host,
+		size:    size,
+		tasks:   make(map[string]*GroupedTask),
+		waiting: make(map[string][]*Task),
+		wg:      &sync.WaitGroup{},
+	}
 }
 
 func (self *Levi) WaitTask() {
 	defer self.wg.Done()
 	for {
 		select {
-		case task := <-inTask:
+		case task := <-self.inTask:
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
 			if _, exists := self.tasks[key]; exists {
 				self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
 			} else {
 				self.tasks[key] = &GroupedTask{
-					Name:  task.name,
+					Name:  task.Name,
 					Uid:   task.Uid,
 					Type:  task.Type,
 					Id:    uuid.New(),
-					Tasks: make([]*Tasks),
+					Tasks: []*Task{},
 				}
 			}
 			if self.Len() >= self.size {
@@ -69,7 +77,7 @@ func (self *Levi) Close() {
 
 func (self *Levi) SendTasks() {
 	logger.Debug(self.tasks)
-	self.wg.add(len(self.tasks))
+	self.wg.Add(len(self.tasks))
 	for _, groupedTask := range self.tasks {
 		go func(groupedTask *GroupedTask) {
 			defer self.wg.Done()
@@ -100,7 +108,8 @@ func (self *Levi) Run() {
 		case err == nil:
 			logger.Debug(taskReply)
 			for taskUUID, taskReplies := range taskReply {
-				if tasks, exists := self.waiting[taskUUID]; !exists || (exists && len(tasks) != len(taskReplies)) {
+				tasks, exists := self.waiting[taskUUID]
+				if !exists || (exists && len(tasks) != len(taskReplies)) {
 					continue
 				}
 				for i := 0; i < len(tasks); i = i + 1 {
@@ -144,7 +153,7 @@ func (self *Levi) Run() {
 func (self *Levi) Len() int {
 	count := 0
 	for _, value := range self.tasks {
-		count = count + len(value)
+		count = count + len(value.Tasks)
 	}
 	return count
 }
