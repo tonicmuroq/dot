@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"github.com/CMGS/websocket"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,6 +33,10 @@ type Connection struct {
 type Hub struct {
 	levis         map[string]*Levi
 	lastCheckTime map[string]time.Time
+	appIds        []int
+	done          chan int
+	closed        chan bool
+	size          int
 }
 
 // Hub methods
@@ -55,6 +58,32 @@ func (self *Hub) CheckAlive() {
 	}
 }
 
+func (self *Hub) Run() {
+	finish := false
+	for !finish {
+		select {
+		case appId := <-self.done:
+			self.appIds = append(self.appIds, appId)
+			if len(self.appIds) >= self.size {
+				logger.Info("restart nginx")
+			}
+		case <-self.closed:
+			if len(self.appIds) != 0 {
+				logger.Info("restart nginx")
+			}
+			finish = true
+		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
+			if len(self.appIds) != 0 {
+				logger.Info("restart nginx")
+			}
+		}
+	}
+}
+
+func (self *Hub) RestartNginx() {
+	self.appIds = []int{}
+}
+
 func (self *Hub) AddLevi(levi *Levi) {
 	host := levi.host
 	self.levis[host] = levi
@@ -66,8 +95,8 @@ func (self *Hub) GetLevi(host string) *Levi {
 }
 
 func (self *Hub) RemoveLevi(host string) {
-	levi, ok := self.GetLevi(host)
-	if !ok {
+	levi, ok := self.levis[host]
+	if !ok || levi == nil {
 		return
 	}
 	levi.Close()
@@ -79,11 +108,12 @@ func (self *Hub) Close() {
 	for _, levi := range self.levis {
 		levi.Close()
 	}
+	self.closed <- true
 }
 
 func (self *Hub) Dispatch(host string, task *Task) error {
-	levi, ok := self.GetLevi(host)
-	if !ok {
+	levi, ok := self.levis[host]
+	if !ok || levi == nil {
 		return errors.New(fmt.Sprintf("%s levi not exists", host))
 	}
 	levi.inTask <- task
@@ -93,6 +123,10 @@ func (self *Hub) Dispatch(host string, task *Task) error {
 var hub = &Hub{
 	levis:         make(map[string]*Levi),
 	lastCheckTime: make(map[string]time.Time),
+	appIds:        []int{},
+	done:          make(chan int),
+	closed:        make(chan bool),
+	size:          5,
 }
 
 // Connection methods

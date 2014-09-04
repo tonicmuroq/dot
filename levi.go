@@ -113,6 +113,7 @@ func (self *Levi) Run() {
 				if !exists || (exists && len(tasks) != len(taskReplies)) {
 					continue
 				}
+				var app *Application
 				for i := 0; i < len(tasks); i = i + 1 {
 					task := tasks[i]
 					retval := taskReplies[i]
@@ -127,7 +128,8 @@ func (self *Levi) Run() {
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
 					case RemoveContainer:
 						old := GetContainerByCid(task.Container)
-						if old == nil {
+						app := old.Application()
+						if old == nil || app == nil {
 							logger.Info("要删的容器已经不在了")
 							continue
 						}
@@ -146,6 +148,11 @@ func (self *Levi) Run() {
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
 					}
 				}
+				// 一次一个appId就够了
+				if app != nil {
+					hub.done <- app.Id
+				}
+				delete(self.waiting, taskUUID)
 			}
 		}
 	}
