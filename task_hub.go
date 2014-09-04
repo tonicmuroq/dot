@@ -3,8 +3,6 @@ package main
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -13,13 +11,6 @@ const (
 	UpdateContainer = 3
 	BuildImage      = 4
 )
-
-type TaskHub struct {
-	queue chan *Task
-	size  int
-	wg    *sync.WaitGroup
-	mutex *sync.Mutex
-}
 
 type Task struct {
 	Name      string
@@ -36,8 +27,6 @@ type Task struct {
 	Container string
 }
 
-var taskHub *TaskHub
-
 type GroupedTask struct {
 	Name  string
 	Uid   int
@@ -47,63 +36,6 @@ type GroupedTask struct {
 }
 
 type TaskReply map[string][]interface{}
-
-// TaskHub
-func (self *TaskHub) GetTask() *Task {
-	return <-self.queue
-}
-
-func (self *TaskHub) AddTask(task *Task) {
-	self.queue <- task
-	logger.Debug(len(self.queue))
-	if len(self.queue) >= self.size {
-		logger.Debug("full, do dispatch")
-		self.Dispatch()
-	}
-}
-
-func (self *TaskHub) FinishOneTask() {
-	self.wg.Done()
-}
-
-func (self *TaskHub) Run() {
-	for {
-		count := len(self.queue)
-		if count > 0 {
-			logger.Debug("period check")
-			self.Dispatch()
-			logger.Debug("period check done")
-		} else {
-			logger.Debug("empty")
-		}
-		time.Sleep(time.Duration(config.Task.Dispatch) * time.Second)
-	}
-}
-
-func (self *TaskHub) Dispatch() {
-	self.mutex.Lock()
-	count := len(self.queue)
-	self.wg.Add(count)
-	for i := 0; i < count; i = i + 1 {
-		_ = self.GetTask()
-	}
-	self.wg.Wait()
-	self.mutex.Unlock()
-	logger.Debug("finish, restart nginx")
-}
-
-func (self *TaskHub) RegroupTasks() *GroupedTask {
-	return nil
-}
-
-func init() {
-	taskHub = &TaskHub{
-		queue: make(chan *Task, config.Task.Queuesize),
-		size:  config.Task.Queuesize,
-		wg:    &sync.WaitGroup{},
-		mutex: &sync.Mutex{},
-	}
-}
 
 // Task
 func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
