@@ -39,17 +39,12 @@ type Hub struct {
 func (self *Hub) CheckAlive() {
 	for {
 		for host, last := range self.lastCheckTime {
-			duration := time.Now().Sub(last)
+			duration := time.Since(last)
 			// 类型真恶心, 自动转换会死啊
 			// 如果一个连接不再存在, 那么先关闭连接, 再删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
-				log.Println(host, " is disconnected.")
-				levi, exists := self.levis[host]
-				if exists {
-					levi.Close()
-				}
-				delete(self.levis, host)
-				delete(self.lastCheckTime, host)
+				logger.Info(host, " is disconnected.")
+				self.RemoveLevi(host)
 			}
 		}
 		for host, levi := range self.levis {
@@ -70,6 +65,11 @@ func (self *Hub) GetLevi(host string) *Levi {
 }
 
 func (self *Hub) RemoveLevi(host string) {
+	levi, ok := self.GetLevi(host)
+	if !ok {
+		return
+	}
+	levi.Close()
 	delete(self.levis, host)
 	delete(self.lastCheckTime, host)
 }
@@ -80,19 +80,31 @@ func (self *Hub) Close() {
 	}
 }
 
+func (self *Hub) Dispatch(host string, task *Task) {
+	levi, ok := self.GetLevi(host)
+	if !ok {
+		logger.Info("Not exists")
+		return
+	}
+	levi.inTask <- task
+}
+
 var hub = &Hub{
 	levis:         make(map[string]*Levi),
 	lastCheckTime: make(map[string]time.Time),
 }
 
-// Connection methods
-func (self *Connection) Read() ([]byte, error) {
+func (self *Connection) Init() {
 	self.ws.SetReadLimit(maxMessageSize)
 	self.ws.SetPongHandler(func(string) error {
 		self.ws.SetReadDeadline(time.Now().Add(pongWait))
 		hub.lastCheckTime[self.host] = time.Now()
 		return nil
 	})
+}
+
+// Connection methods
+func (self *Connection) Read() ([]byte, error) {
 	_, message, err := self.ws.ReadMessage()
 	return message, err
 }
@@ -116,21 +128,16 @@ func (self *Connection) CloseConnection() error {
 }
 
 func (self *Connection) Listen() {
+	defer hub.RemoveLevi(self.host)
 	for !self.closed {
 		msg, err := self.Read()
 		if err != nil {
-			log.Println("出错了, 那么退出这个goroutine吧")
+			logger.Info(err, "Listen")
 			self.CloseConnection()
 		}
 		// TODO action
 		self.Write(websocket.TextMessage, []byte(msg))
 	}
-	defer func() {
-		levi := hub.GetLevi(self.host)
-		levi.Close()
-		hub.RemoveLevi(self.host)
-		log.Println("连接关闭", self)
-	}()
 }
 
 func ServeWs(w http.ResponseWriter, r *http.Request) {
@@ -146,13 +153,14 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		logger.Info(err)
 		return
 	}
 
 	// 创建个新连接, 新建一条host记录
 	// 同时开始 listen
 	c := &Connection{ws: ws, host: ip, port: port, closed: false}
+	c.Init()
 	levi := NewLevi(c, config.Task.Queuesize)
 	hub.AddLevi(levi)
 	NewHost(ip, "")
