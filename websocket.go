@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/CMGS/websocket"
 	"net/http"
 	"strconv"
@@ -170,10 +171,10 @@ func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 	ws.SetReadLimit(maxMessageSize)
 	ws.SetPongHandler(func(string) error {
 		ws.SetReadDeadline(time.Now().Add(pongWait))
-		hub.lastCheckTime[c.host] = time.Now()
+		hub.lastCheckTime[host] = time.Now()
 		return nil
 	})
-	c := &Connection{ws: ws, host: ip, port: port, closed: false}
+	c := &Connection{ws: ws, host: host, port: port, closed: false}
 	return c
 }
 
