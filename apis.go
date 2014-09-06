@@ -46,7 +46,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["msg"] = "no such app"
 	} else {
 		task := AddContainerTask(app, host, false)
-		if err := hub.Dispatch(host.Ip, task); err != nil {
+		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 0
 			r["msg"] = err.Error()
 		}
