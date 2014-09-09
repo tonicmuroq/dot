@@ -130,7 +130,14 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	// 配置文件更改
 	for _, service := range appYamlJson.Services {
 		if service == "mysql" {
-			oconfigYamlJson["mysql"] = CreateDatabase(&app)
+			if dbInfoString := app.GetOrCreateDbInfo(); dbInfoString != "" {
+				var d map[string]interface{}
+				if err := JSONDecode(dbInfoString, &d); err == nil {
+					oconfigYamlJson["mysql"] = d
+				} else {
+					logger.Info("mysql create failed")
+				}
+			}
 		}
 		if service == "redis" {
 			oconfigYamlJson["redis"] = CreateRedis(&app)
@@ -154,6 +161,26 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 		return nil
 	}
 	return &app
+}
+
+func (self *Application) GetOrCreateDbInfo() string {
+	cpath := path.Join(appPathPrefix, self.Name, "mysql")
+	if _, err := etcdClient.Create(cpath, "", 0); err == nil {
+		db, err := CreateDatabase(self)
+		if err != nil {
+			return ""
+		}
+		if json, err := JSONEncode(db); err == nil {
+			etcdClient.Set(cpath, json, 0)
+			return json
+		}
+		return ""
+	} else {
+		if r, err := etcdClient.Get(cpath, false, false); err == nil {
+			return r.Node.Value
+		}
+		return ""
+	}
 }
 
 func (self *Application) GetYamlPath(cpath string) string {

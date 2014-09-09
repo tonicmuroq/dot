@@ -2,8 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"os/user"
+	"strconv"
 )
 
 func JSONDecode(data string, v interface{}) error {
@@ -59,19 +64,37 @@ func EnsureFileAbsent(path string) error {
 	return os.Remove(path)
 }
 
-func CreateDatabase(app *Application) map[string]interface{} {
+func CreateDatabase(app *Application) (map[string]interface{}, error) {
 	// TODO 接入数据库
 	// businessCode := app.Name
 	// dbName := app.Name
 	// dbUid := app.Name
 	// dbPwd := "123"
-	r := make(map[string]interface{})
-	r["username"] = app.Name
-	r["password"] = ""
-	r["host"] = "localhost"
-	r["port"] = 3306
-	r["db"] = app.Name
-	return r
+	v := url.Values{}
+	v.Set("SysUid", config.Dba.Sysuid)
+	v.Set("SysPwd", config.Dba.Syspwd)
+	v.Set("businessCode", config.Dba.Sysuid)
+	v.Set("DbName", app.Name)
+	v.Set("DbUid", app.Name)
+	v.Set("DbPwd", "xxxxxx")
+	if r, err := http.DefaultClient.PostForm("http://192.168.8.213:8088/createdatabase.aspx", v); err == nil {
+		defer r.Body.Close()
+		result, _ := ioutil.ReadAll(r.Body)
+		var d map[string]string
+		json.Unmarshal(result, &d)
+		if d["Result"] == "1" {
+			return nil, errors.New("create mysql failed")
+		}
+		ret := make(map[string]interface{})
+		ret["username"] = d["DbUser"]
+		ret["password"] = d["DbPwd"]
+		ret["host"] = d["IPAddress"]
+		ret["port"], _ = strconv.Atoi(d["Port"])
+		ret["db"] = d["DbName"]
+		return ret, nil
+	} else {
+		return nil, err
+	}
 }
 
 func CreateRedis(app *Application) map[string]interface{} {

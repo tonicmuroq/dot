@@ -31,6 +31,12 @@ type NginxConfig struct {
 	Port     int
 }
 
+type DbaConfig struct {
+	Sysuid string
+	Syspwd string
+	Bcode  string
+}
+
 type DotConfig struct {
 	Bind    string
 	Pidfile string
@@ -39,6 +45,7 @@ type DotConfig struct {
 	Etcd  EtcdConfig
 	Task  TaskConfig
 	Nginx NginxConfig
+	Dba   DbaConfig
 }
 
 var config = DotConfig{}
