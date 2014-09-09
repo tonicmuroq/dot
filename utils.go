@@ -73,7 +73,7 @@ func CreateDatabase(app *Application) (map[string]interface{}, error) {
 	v := url.Values{}
 	v.Set("SysUid", config.Dba.Sysuid)
 	v.Set("SysPwd", config.Dba.Syspwd)
-	v.Set("businessCode", config.Dba.Sysuid)
+	v.Set("businessCode", config.Dba.Bcode)
 	v.Set("DbName", app.Name)
 	v.Set("DbUid", app.Name)
 	v.Set("DbPwd", "xxxxxx")
