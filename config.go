@@ -26,9 +26,9 @@ type TaskConfig struct {
 }
 
 type NginxConfig struct {
-	Template      string
-	Conf          string
-	Levinginxport int
+	Template string
+	Conf     string
+	Port     int
 }
 
 type DotConfig struct {

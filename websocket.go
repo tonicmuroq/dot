@@ -110,7 +110,7 @@ func (self *Hub) RestartNginx() {
 					continue
 				}
 				for _, host := range hosts {
-					hostStr := fmt.Sprintf("%s:%s", host.IP, config.Nginx.Levinginxport)
+					hostStr := fmt.Sprintf("%s:%s", host.IP, config.Nginx.Port)
 					data.Hosts = append(data.Hosts, hostStr)
 				}
 				tmpl := template.Must(template.ParseFiles(config.Nginx.Template))
