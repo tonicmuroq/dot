@@ -88,13 +88,8 @@ func (self *Hub) Run() {
 func (self *Hub) RestartNginx() {
 	for _, appId := range self.appIds {
 		if app := GetApplicationById(appId); app != nil {
+
 			conf := path.Join(config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
-			f, err := os.Create(conf)
-			defer f.Close()
-			if err != nil {
-				logger.Info("Create nginx conf failed", err)
-				continue
-			}
 			var data = struct {
 				Name  string
 				Hosts []string
@@ -102,14 +97,26 @@ func (self *Hub) RestartNginx() {
 				Name:  app.Name,
 				Hosts: []string{},
 			}
+
 			hosts := app.Hosts()
-			for _, host := range hosts {
-				hostStr := fmt.Sprintf("%s:%s", host.IP, config.Nginx.Levinginxport)
-				data.Hosts = append(data.Hosts, hostStr)
-			}
-			tmpl := template.Must(template.ParseFiles(config.Nginx.Template))
-			if err := tmpl.Execute(f, data); err != nil {
-				logger.Info("Render nginx conf failed", err)
+
+			if len(hosts) == 0 {
+				EnsureFileAbsent(conf)
+			} else {
+				f, err := os.Create(conf)
+				defer f.Close()
+				if err != nil {
+					logger.Info("Create nginx conf failed", err)
+					continue
+				}
+				for _, host := range hosts {
+					hostStr := fmt.Sprintf("%s:%s", host.IP, config.Nginx.Levinginxport)
+					data.Hosts = append(data.Hosts, hostStr)
+				}
+				tmpl := template.Must(template.ParseFiles(config.Nginx.Template))
+				if err := tmpl.Execute(f, data); err != nil {
+					logger.Info("Render nginx conf failed", err)
+				}
 			}
 		}
 	}
