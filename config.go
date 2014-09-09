@@ -25,13 +25,20 @@ type TaskConfig struct {
 	Cpus      int
 }
 
+type NginxConfig struct {
+	Template string
+	Conf     string
+	Port     int
+}
+
 type DotConfig struct {
 	Bind    string
 	Pidfile string
 
-	Db   DbConfig
-	Etcd EtcdConfig
-	Task TaskConfig
+	Db    DbConfig
+	Etcd  EtcdConfig
+	Task  TaskConfig
+	Nginx NginxConfig
 }
 
 var config = DotConfig{}
@@ -54,7 +61,6 @@ func LoadConfig() {
 	if err := yaml.Unmarshal(b, &config); err != nil {
 		logger.Assert(err, "Load config file failed")
 	}
-	logger.Debug(config)
 }
 
 func init() {

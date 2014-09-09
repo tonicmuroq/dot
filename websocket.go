@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"github.com/CMGS/websocket"
 	"net/http"
+	"os"
+	"os/exec"
+	"path"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 )
 
@@ -82,6 +86,44 @@ func (self *Hub) Run() {
 }
 
 func (self *Hub) RestartNginx() {
+	for _, appId := range self.appIds {
+		if app := GetApplicationById(appId); app != nil {
+
+			conf := path.Join(config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
+			var data = struct {
+				Name  string
+				Hosts []string
+			}{
+				Name:  app.Name,
+				Hosts: []string{},
+			}
+
+			hosts := app.Hosts()
+
+			if len(hosts) == 0 {
+				EnsureFileAbsent(conf)
+			} else {
+				f, err := os.Create(conf)
+				defer f.Close()
+				if err != nil {
+					logger.Info("Create nginx conf failed", err)
+					continue
+				}
+				for _, host := range hosts {
+					hostStr := fmt.Sprintf("%s:%s", host.IP, config.Nginx.Port)
+					data.Hosts = append(data.Hosts, hostStr)
+				}
+				tmpl := template.Must(template.ParseFiles(config.Nginx.Template))
+				if err := tmpl.Execute(f, data); err != nil {
+					logger.Info("Render nginx conf failed", err)
+				}
+			}
+		}
+	}
+	cmd := exec.Command("nginx", "-s", "reload")
+	if err := cmd.Run(); err != nil {
+		logger.Info("Restart nginx failed", err)
+	}
 	self.appIds = []int{}
 }
 
