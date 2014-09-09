@@ -58,3 +58,26 @@ func EnsureDirAbsent(path string) error {
 func EnsureFileAbsent(path string) error {
 	return os.Remove(path)
 }
+
+func CreateDatabase(app *Application) map[string]interface{} {
+	// TODO 接入数据库
+	// businessCode := app.Name
+	// dbName := app.Name
+	// dbUid := app.Name
+	// dbPwd := "123"
+	r := make(map[string]interface{})
+	r["username"] = app.Name
+	r["password"] = ""
+	r["host"] = "localhost"
+	r["port"] = 3306
+	r["db"] = app.Name
+	return r
+}
+
+func CreateRedis(app *Application) map[string]interface{} {
+	// TODO 接入redis
+	r := make(map[string]interface{})
+	r["host"] = "localhost"
+	r["port"] = 6379
+	return r
+}

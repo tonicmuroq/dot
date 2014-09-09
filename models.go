@@ -47,11 +47,12 @@ type Application struct {
 }
 
 type AppYaml struct {
-	Appname string   `json:appname`
-	Runtime string   `json:runtime`
-	Port    int      `json:port`
-	Cmd     []string `json:cmd`
-	Build   []string `json:build`
+	Appname  string   `json:appname`
+	Runtime  string   `json:runtime`
+	Port     int      `json:port`
+	Cmd      []string `json:cmd`
+	Build    []string `json:build`
+	Services []string `json:services`
 }
 
 type ConfigYaml map[string]interface{}
@@ -106,7 +107,8 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		configyaml = "{}"
 	}
 	var appYamlJson AppYaml
-	if err := JSONDecode(appyaml, &appYamlJson); err != nil {
+	var oconfigYamlJson ConfigYaml
+	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &oconfigYamlJson); err1 != nil || err2 != nil {
 		return nil
 	}
 
@@ -125,9 +127,22 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		return nil
 	}
 
-	// 保存配置文件
+	// 配置文件更改
+	for _, service := range appYamlJson.Services {
+		if service == "mysql" {
+			oconfigYamlJson["mysql"] = CreateDatabase(&app)
+		}
+		if service == "redis" {
+			oconfigYamlJson["redis"] = CreateRedis(&app)
+		}
+	}
+
+	if newConfigYaml, err := JSONEncode(oconfigYamlJson); err == nil {
+		etcdClient.Create((&app).GetYamlPath("config"), newConfigYaml, 0)
+	}
+
 	etcdClient.Create((&app).GetYamlPath("app"), appyaml, 0)
-	etcdClient.Create((&app).GetYamlPath("config"), configyaml, 0)
+	etcdClient.Create((&app).GetYamlPath("original-config"), configyaml, 0)
 
 	return &app
 }
