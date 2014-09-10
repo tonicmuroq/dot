@@ -63,7 +63,6 @@ type ConfigYaml map[string]interface{}
 // 可能还需要连接 redis
 func init() {
 	// mysql
-	// TODO 改成参数配置
 	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
 	orm.RegisterModel(new(Application), new(User), new(Host), new(Container))
 	orm.RunSyncdb(config.Db.Name, true, true)
@@ -78,6 +77,7 @@ func init() {
 	// Mutex
 	portMutex = sync.Mutex{}
 
+	// for testing
 	app := NewApplication("projectname", "12345", `{"appname": "test", "runtime": "python", "port": 5000, "cmd": ["pip install"]}`, "")
 	host := NewHost("127.0.0.1", "tonic")
 	NewContainer(app, host, 12345, "12345", "")

@@ -49,7 +49,6 @@ func (self *Hub) CheckAlive() {
 	for {
 		for host, last := range self.lastCheckTime {
 			duration := time.Since(last)
-			// 类型真恶心, 自动转换会死啊
 			// 如果一个连接不再存在, 那么先关闭连接, 再删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
 				logger.Info(host, " is disconnected.")
@@ -169,7 +168,7 @@ var hub = &Hub{
 	appIds:        []int{},
 	done:          make(chan int),
 	closed:        make(chan bool),
-	size:          5,
+	size:          10,
 }
 
 // Connection methods

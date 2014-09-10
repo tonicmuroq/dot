@@ -12,6 +12,14 @@ const (
 	BuildImage      = 4
 )
 
+type BuildTask struct {
+	Name    string
+	Version string
+	Group   string
+	Base    string
+	Build   string
+}
+
 type Task struct {
 	Name      string
 	Version   string
@@ -25,6 +33,7 @@ type Task struct {
 	Cpus      int
 	Daemon    string
 	Container string
+	Build     BuildTask
 }
 
 type GroupedTask struct {
@@ -133,5 +142,22 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		Cpus:      config.Task.Cpus,
 		Daemon:    daemonId,
 		Container: container.ContainerId}
+	return &task
+}
+
+func BuildImageTask(app *Application, group, name, version, base, build string) *Task {
+	buildTask := BuildTask{
+		Name:    name,
+		Version: version,
+		Group:   group,
+		Base:    base,
+		Build:   build,
+	}
+	task := Task{
+		Name:  app.Name,
+		Uid:   app.UserUid(),
+		Type:  BuildImage,
+		Build: buildTask,
+	}
 	return &task
 }
