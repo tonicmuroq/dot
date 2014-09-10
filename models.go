@@ -107,9 +107,13 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		configyaml = "{}"
 	}
 	var appYamlJson AppYaml
-	var oconfigYamlJson ConfigYaml
+	var oconfigYamlJson, copyConfigYamlJson ConfigYaml
 	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &oconfigYamlJson); err1 != nil || err2 != nil {
 		return nil
+	}
+
+	for k, v := range oconfigYamlJson {
+		copyConfigYamlJson[k] = v
 	}
 
 	// 生成新用户
@@ -118,6 +122,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	if _, id, err := db.ReadOrCreate(&user, "Name"); err == nil {
 		user.Id = int(id)
 	} else {
+		logger.Info("create user failed", err)
 		return nil
 	}
 
@@ -144,12 +149,19 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		}
 	}
 
-	if newConfigYaml, err := JSONEncode(oconfigYamlJson); err == nil {
+	if newConfigYaml, err := YAMLEncode(oconfigYamlJson); err == nil {
 		etcdClient.Create((&app).GetYamlPath("config"), newConfigYaml, 0)
 	}
-
-	etcdClient.Create((&app).GetYamlPath("app"), appyaml, 0)
-	etcdClient.Create((&app).GetYamlPath("original-config"), configyaml, 0)
+	if appYaml, err := YAMLEncode(appYamlJson); err == nil {
+		etcdClient.Create((&app).GetYamlPath("app"), appYaml, 0)
+	}
+	if configYaml, err := YAMLEncode(copyConfigYamlJson); err == nil {
+		if len(configYaml) == 0 {
+			etcdClient.Create((&app).GetYamlPath("original-config"), "", 0)
+		} else {
+			etcdClient.Create((&app).GetYamlPath("original-config"), configYaml, 0)
+		}
+	}
 
 	return &app
 }

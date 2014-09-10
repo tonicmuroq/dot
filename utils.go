@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"gopkg.in/yaml.v1"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -17,6 +18,15 @@ func JSONDecode(data string, v interface{}) error {
 
 func JSONEncode(v interface{}) (string, error) {
 	r, err := json.Marshal(v)
+	return string(r), err
+}
+
+func YAMLDecode(data string, v interface{}) error {
+	return yaml.Unmarshal([]byte(data), v)
+}
+
+func YAMLEncode(v interface{}) (string, error) {
+	r, err := yaml.Marshal(v)
 	return string(r), err
 }
 
