@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	appPathPrefix = "/nbe/app/"
+	appPathPrefix = "/NBE/"
 )
 
 var db orm.Ormer
