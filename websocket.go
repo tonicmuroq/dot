@@ -79,6 +79,7 @@ func (self *Hub) Run() {
 			}
 			finish = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
+			logger.Debug("Hub time check: ", self.appIds)
 			if len(self.appIds) != 0 {
 				logger.Info("restart nginx")
 				self.RestartNginx()
@@ -112,7 +113,7 @@ func (self *Hub) RestartNginx() {
 					continue
 				}
 				for _, host := range hosts {
-					hostStr := fmt.Sprintf("%s:%s", host.IP, config.Nginx.Port)
+					hostStr := fmt.Sprintf("%s:%v", host.IP, config.Nginx.Port)
 					data.Hosts = append(data.Hosts, hostStr)
 				}
 				tmpl := template.Must(template.ParseFiles(config.Nginx.Template))

@@ -127,7 +127,7 @@ func (self *Levi) Run() {
 					switch task.Type {
 					case AddContainer:
 						logger.Debug("Add container Feedback")
-						app := GetApplicationByNameAndVersion(task.Name, task.Version)
+						app = GetApplicationByNameAndVersion(task.Name, task.Version)
 						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
@@ -137,7 +137,7 @@ func (self *Levi) Run() {
 					case RemoveContainer:
 						logger.Debug("Remove container Feedback")
 						old := GetContainerByCid(task.Container)
-						app := old.Application()
+						app = old.Application()
 						if old == nil || app == nil {
 							logger.Info("要删的容器已经不在了")
 							continue
@@ -149,7 +149,7 @@ func (self *Levi) Run() {
 						if old != nil {
 							old.Delete()
 						}
-						app := GetApplicationByNameAndVersion(task.Name, task.Version)
+						app = GetApplicationByNameAndVersion(task.Name, task.Version)
 						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
@@ -159,6 +159,7 @@ func (self *Levi) Run() {
 					}
 				}
 				// 一次一个appId就够了
+				logger.Debug("levi run app: ", app)
 				if app != nil {
 					hub.done <- app.Id
 				}
