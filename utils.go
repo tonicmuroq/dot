@@ -92,7 +92,7 @@ func CreateDatabase(app *Application) (map[string]interface{}, error) {
 		result, _ := ioutil.ReadAll(r.Body)
 		var d map[string]string
 		json.Unmarshal(result, &d)
-		if d["Result"] == "1" {
+		if d["Result"] == "0" {
 			return nil, errors.New("create mysql failed")
 		}
 		ret := make(map[string]interface{})
