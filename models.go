@@ -24,6 +24,12 @@ type Host struct {
 	Name string
 }
 
+type HostPort struct {
+	Id     int
+	HostId int
+	Port   int
+}
+
 type Container struct {
 	Id          int
 	Port        int
@@ -64,7 +70,7 @@ type ConfigYaml map[string]interface{}
 func init() {
 	// mysql
 	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
-	orm.RegisterModel(new(Application), new(User), new(Host), new(Container))
+	orm.RegisterModel(new(Application), new(User), new(Host), new(Container), new(HostPort))
 	orm.RunSyncdb(config.Db.Name, true, false)
 	db = orm.NewOrm()
 
@@ -301,6 +307,25 @@ func (self *Host) Containers() []*Container {
 	return cs
 }
 
+func (self *Host) Ports() []int {
+	var ports []*HostPort
+	db.QueryTable(new(HostPort)).Filter("HostId", self.Id).OrderBy("Port").All(&ports)
+	r := make([]int, len(ports))
+	for i := 0; i < len(ports); i = i + 1 {
+		r[i] = ports[i].Port
+	}
+	return r
+}
+
+func (self *Host) AddPort(port int) {
+	hostPort := HostPort{HostId: self.Id, Port: port}
+	db.Insert(&hostPort)
+}
+
+func (self *Host) RemovePort(port int) {
+	db.Raw("DELETE FROM host_port WHERE host_id=? AND port=?", self.Id, port).Exec()
+}
+
 // Container
 func (self *Container) TableIndex() [][]string {
 	return [][]string{
@@ -319,6 +344,13 @@ func (self *Container) Host() *Host {
 }
 
 func (self *Container) Delete() bool {
+	host := self.Host()
+	if host != nil {
+		host.RemovePort(self.Port)
+	} else {
+		logger.Debug("Host not found when deleting container")
+		return false
+	}
 	if _, err := db.Delete(&Container{Id: self.Id}); err == nil {
 		return true
 	}
@@ -347,27 +379,30 @@ func GetContainerByCid(cid string) *Container {
 // 只允许一个访问
 func GetPortFromHost(host *Host) int {
 	portMutex.Lock()
+	defer portMutex.Unlock()
 	newPort := 49000
 
-	cs := host.Containers()
-	length := len(cs)
+	ports := host.Ports()
+	logger.Debug("ports are: ", ports)
+	length := len(ports)
 	if length > 0 {
 		var i int
 		for i = 1; i < length; i = i + 1 {
-			tmpPort := cs[0].Port
-			if tmpPort+1 != cs[i].Port {
+			tmpPort := ports[i-1]
+			if tmpPort+1 != ports[i] {
 				newPort = tmpPort + 1
 				break
 			}
 		}
 		if i == length {
-			newPort = cs[i-1].Port + 1
+			newPort = ports[i-1] + 1
 		}
 	}
-	portMutex.Unlock()
 
 	if newPort >= 50000 {
 		return 0
+	} else {
+		host.AddPort(newPort)
 	}
 
 	return newPort
