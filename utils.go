@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"gopkg.in/yaml.v1"
@@ -9,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"time"
 )
 
 func JSONDecode(data string, v interface{}) error {
@@ -47,13 +50,16 @@ func CreateDatabase(app *Application) (map[string]interface{}, error) {
 	// dbName := app.Name
 	// dbUid := app.Name
 	// dbPwd := "123"
+	t := time.Now().String()
+	code := CreateSha1HexValue([]byte(app.Name + app.Version + t))
+
 	v := url.Values{}
 	v.Set("SysUid", config.Dba.Sysuid)
 	v.Set("SysPwd", config.Dba.Syspwd)
 	v.Set("businessCode", config.Dba.Bcode)
 	v.Set("DbName", app.Name)
 	v.Set("DbUid", app.Name)
-	v.Set("DbPwd", "xxxxxx")
+	v.Set("DbPwd", code[:8])
 	if r, err := http.DefaultClient.PostForm(config.Dba.Addr, v); err == nil {
 		defer r.Body.Close()
 		result, _ := ioutil.ReadAll(r.Body)
@@ -80,4 +86,13 @@ func CreateRedis(app *Application) map[string]interface{} {
 	r["host"] = "localhost"
 	r["port"] = 6379
 	return r
+}
+
+func CreateSha1HexValue(data []byte) string {
+	r := sha1.Sum(data)
+	x := make([]byte, len(r))
+	for index, d := range r {
+		x[index] = d
+	}
+	return hex.EncodingToString(x)
 }
