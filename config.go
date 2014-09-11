@@ -35,6 +35,7 @@ type DbaConfig struct {
 	Sysuid string
 	Syspwd string
 	Bcode  string
+	Addr   string
 }
 
 type DotConfig struct {

@@ -163,6 +163,10 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		}
 	}
 
+	// 生成必须路径
+	etcdClient.CreateDir(path.Join(appPathPrefix, "_Apps", app.Name, "daemons"), 0)
+	etcdClient.CreateDir(path.Join(appPathPrefix, "_Apps", app.Name, "apps"), 0)
+
 	return &app
 }
 

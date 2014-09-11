@@ -8,4 +8,21 @@ etcd:
     sync: true
     machines:
         - "127.0.0.1:4001"
-        - "127.0.0.1:4002"
+        # - "10.1.201.110:4001"
+        # - "10.1.201.110:4002"
+        # - "10.1.201.110:4003"
+        # - "10.1.201.110:4004"
+        # - "10.1.201.110:4005"
+task:
+    dispatch: 5
+    queuesize: 10
+    restartsize: 5
+nginx:
+    template: "templates/nginx.tmpl"
+    conf: "."
+    levinginxport: 80
+dba:
+    sysuid: "CreateDbUser"
+    syspwd: "CreateDbUser"
+    bcode: "codetest"
+    addr: "http://192.168.8.213:8088/createdatabase.aspx"

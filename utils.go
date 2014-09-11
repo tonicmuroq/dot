@@ -87,7 +87,7 @@ func CreateDatabase(app *Application) (map[string]interface{}, error) {
 	v.Set("DbName", app.Name)
 	v.Set("DbUid", app.Name)
 	v.Set("DbPwd", "xxxxxx")
-	if r, err := http.DefaultClient.PostForm("http://192.168.8.213:8088/createdatabase.aspx", v); err == nil {
+	if r, err := http.DefaultClient.PostForm(config.Dba.Addr, v); err == nil {
 		defer r.Body.Close()
 		result, _ := ioutil.ReadAll(r.Body)
 		var d map[string]string
