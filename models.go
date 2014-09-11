@@ -65,7 +65,7 @@ func init() {
 	// mysql
 	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
 	orm.RegisterModel(new(Application), new(User), new(Host), new(Container))
-	orm.RunSyncdb(config.Db.Name, true, true)
+	orm.RunSyncdb(config.Db.Name, true, false)
 	db = orm.NewOrm()
 
 	// etcd
@@ -78,11 +78,9 @@ func init() {
 	portMutex = sync.Mutex{}
 
 	// for testing
-	app := NewApplication("projectname", "12345", `{"appname": "test", "runtime": "python", "port": 5000, "cmd": ["pip install"]}`, "")
-	host := NewHost("127.0.0.1", "tonic")
-	NewContainer(app, host, 12345, "12345", "")
-	NewContainer(app, host, 12346, "12345", "")
-	NewContainer(app, host, 12347, "12345", "")
+	NewApplication("blueberry", "11111", `{"appname": "blurry", "runtime": "python", "port": 5000, "cmd": ["pip install"], "services": ["mysql", "redis"]}`, "")
+	NewApplication("nbetest", "11111", `{"appname": "blu", "runtime": "python", "port": 5000, "cmd": ["pip install"], "services": ["mysql", "redis"]}`, "")
+	NewHost("127.0.0.1", "tonic")
 }
 
 // Application
@@ -213,7 +211,7 @@ func (self *Application) GetAppYaml() (*AppYaml, error) {
 	if r.Node.Dir {
 		return &appYaml, errors.New("should not be dir")
 	}
-	if err = JSONDecode(r.Node.Value, &appYaml); err != nil {
+	if err = YAMLDecode(r.Node.Value, &appYaml); err != nil {
 		return &appYaml, err
 	}
 	return &appYaml, nil
@@ -229,7 +227,7 @@ func (self *Application) GetConfigYaml() (*ConfigYaml, error) {
 	if r.Node.Dir {
 		return &configYaml, errors.New("should not be dir")
 	}
-	if err = JSONDecode(r.Node.Value, &configYaml); err != nil {
+	if err = YAMLDecode(r.Node.Value, &configYaml); err != nil {
 		return &configYaml, err
 	}
 	return &configYaml, nil

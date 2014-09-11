@@ -158,6 +158,9 @@ func (self *Hub) Dispatch(host string, task *Task) error {
 	if !ok || levi == nil {
 		return errors.New(fmt.Sprintf("%s levi not exists", host))
 	}
+	if task == nil {
+		return errors.New("task is nil")
+	}
 	levi.inTask <- task
 	return nil
 }

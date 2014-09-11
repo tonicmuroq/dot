@@ -38,8 +38,9 @@ func (self *Levi) WaitTask() {
 	for !finish {
 		select {
 		case task, ok := <-self.inTask:
+			logger.Debug("levi got task ", task, ok)
 			if !ok {
-				finish = true
+				self.Close()
 				break
 			}
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
@@ -125,6 +126,7 @@ func (self *Levi) Run() {
 					retval := taskReplies[i]
 					switch task.Type {
 					case AddContainer:
+						logger.Debug("Add container Feedback")
 						app := GetApplicationByNameAndVersion(task.Name, task.Version)
 						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
@@ -133,6 +135,7 @@ func (self *Levi) Run() {
 						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
 					case RemoveContainer:
+						logger.Debug("Remove container Feedback")
 						old := GetContainerByCid(task.Container)
 						app := old.Application()
 						if old == nil || app == nil {
@@ -141,6 +144,7 @@ func (self *Levi) Run() {
 						}
 						old.Delete()
 					case UpdateContainer:
+						logger.Debug("Update container Feedback")
 						old := GetContainerByCid(task.Container)
 						if old != nil {
 							old.Delete()

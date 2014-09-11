@@ -57,6 +57,7 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 		bind = GetPortFromHost(host)
 		daemonId = ""
 		// 没有可以用的端口了
+		logger.Debug("task bind: ", bind)
 		if bind == 0 {
 			return nil
 		}
@@ -64,6 +65,7 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 
 	appYaml, err := app.GetAppYaml()
 	if err != nil {
+		logger.Debug("app.yaml error: ", err)
 		return nil
 	}
 	cmdString := appYaml.Cmd[0]
