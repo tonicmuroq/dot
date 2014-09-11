@@ -70,15 +70,18 @@ func (self *Hub) Run() {
 			self.appIds = append(self.appIds, appId)
 			if len(self.appIds) >= self.size {
 				logger.Info("restart nginx")
+				self.RestartNginx()
 			}
 		case <-self.closed:
 			if len(self.appIds) != 0 {
 				logger.Info("restart nginx")
+				self.RestartNginx()
 			}
 			finish = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
 			if len(self.appIds) != 0 {
 				logger.Info("restart nginx")
+				self.RestartNginx()
 			}
 		}
 	}
