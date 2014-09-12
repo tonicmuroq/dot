@@ -101,7 +101,7 @@ func CreateSha1HexValue(data []byte) string {
 
 // 把src加上dst前缀整个copy
 func CopyFiles(dst, src string) error {
-	if err := os.Mkdir(dst, 0755); err != nil {
+	if err := os.MkdirAll(dst, 0755); err != nil {
 		return err
 	}
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
