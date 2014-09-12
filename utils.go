@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"gopkg.in/yaml.v1"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -94,5 +96,33 @@ func CreateSha1HexValue(data []byte) string {
 	for index, d := range r {
 		x[index] = d
 	}
-	return hex.EncodingToString(x)
+	return hex.EncodeToString(x)
+}
+
+// 把src加上dst前缀整个copy
+func CopyFiles(dst, src string) error {
+	if err := os.Mkdir(dst, 0755); err != nil {
+		return err
+	}
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			e := os.Mkdir(dst+path, info.Mode())
+			return e
+		} else {
+			d, e := os.Create(dst + path)
+			defer d.Close()
+			if e != nil {
+				return e
+			}
+
+			f, e := os.Open(path)
+			defer f.Close()
+			if e != nil {
+				return e
+			}
+
+			io.Copy(d, f)
+		}
+		return err
+	})
 }

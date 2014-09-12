@@ -26,9 +26,11 @@ type TaskConfig struct {
 }
 
 type NginxConfig struct {
-	Template string
-	Conf     string
-	Port     int
+	Template     string
+	Staticdir    string
+	Staticsrcdir string
+	Conf         string
+	Port         int
 }
 
 type DbaConfig struct {

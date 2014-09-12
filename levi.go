@@ -161,7 +161,12 @@ func (self *Levi) Run() {
 				// 一次一个appId就够了
 				logger.Debug("levi run app: ", app)
 				if app != nil {
+					// 告诉hub任务完成
 					hub.done <- app.Id
+					// 复制静态文件到地址
+					staticPath := config.Nginx.Staticdir + fmt.Sprintf("%s_static/%s", app.Name, app.Version)
+					staticSrcPath := config.Nginx.Staticsrcdir + fmt.Sprintf("%s/%s", app.Name, app.Version)
+					CopyFiles(staticPath, staticSrcPath)
 				}
 				delete(self.waiting, taskUUID)
 			}

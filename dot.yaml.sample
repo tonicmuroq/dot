@@ -19,8 +19,10 @@ task:
     restartsize: 5
 nginx:
     template: "templates/nginx.tmpl"
-    conf: "."
-    levinginxport: 80
+    conf: ""
+    port: 80
+    staticdir: "/root/"
+    staticsrcdir: "/mnt/mfs/"
 dba:
     sysuid: "CreateDbUser"
     syspwd: "CreateDbUser"
