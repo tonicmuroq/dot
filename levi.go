@@ -85,7 +85,6 @@ func (self *Levi) Close() {
 }
 
 func (self *Levi) SendTasks() {
-	logger.Debug(self.tasks)
 	self.wg.Add(len(self.tasks))
 	for _, groupedTask := range self.tasks {
 		go func(groupedTask *GroupedTask) {
@@ -116,7 +115,6 @@ func (self *Levi) Run() {
 				finish = true
 			}
 		case err == nil:
-			logger.Debug("taskReply", taskReply)
 			for taskUUID, taskReplies := range taskReply {
 				tasks, exists := self.waiting[taskUUID]
 				if !exists || (exists && len(tasks) != len(taskReplies)) {
@@ -127,6 +125,8 @@ func (self *Levi) Run() {
 				for i := 0; i < len(tasks); i = i + 1 {
 					task := tasks[i]
 					retval := taskReplies[i]
+					logger.Debug("tasks[i]: ", task)
+					logger.Debug("taskReplies[i]: ", retval)
 					if task == nil || retval == nil {
 						logger.Info("task/retval is nil, ignore")
 						continue
