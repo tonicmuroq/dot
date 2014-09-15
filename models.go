@@ -85,7 +85,7 @@ func init() {
 
 	// for testing
 	NewApplication("blueberry", "11111", `{"appname": "blurry", "runtime": "python", "port": 5000, "cmd": ["pip install"], "services": ["mysql", "redis"]}`, "")
-	NewApplication("nbetest", "4f1c7c2", `{"appname": "nbetest", "runtime": "python", "port": 5000, "cmd": ["python app.py"], "services": ["mysql", "redis"]}`, "")
+	app := NewApplication("nbetest", "4f1c7c2", `{"appname": "nbetest", "runtime": "python", "port": 5000, "cmd": ["python app.py"], "services": ["mysql", "redis"]}`, "")
 	NewHost("127.0.0.1", "tonic")
 }
 
@@ -253,10 +253,9 @@ func (self *Application) Hosts() []*Host {
 	var rs orm.ParamsList
 	var hosts []*Host
 	_, err := db.Raw("SELECT distinct(host_id) FROM container WHERE app_id=?", self.Id).ValuesFlat(&rs)
-	if err != nil {
-		return hosts
+	if err == nil && len(rs) > 0 {
+		db.QueryTable(new(Host)).Filter("id__in", rs).All(&hosts)
 	}
-	db.QueryTable(new(Host)).Filter("id__in", rs).All(&hosts)
 	return hosts
 }
 
