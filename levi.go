@@ -4,6 +4,7 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 	"fmt"
 	"net"
+	"path"
 	"sync"
 	"time"
 )
@@ -171,8 +172,8 @@ func (self *Levi) Run() {
 					// 告诉hub任务完成
 					hub.done <- app.Id
 					// 复制静态文件到地址
-					staticPath := config.Nginx.Staticdir + fmt.Sprintf("%s_static/%s", app.Name, app.Version)
-					staticSrcPath := config.Nginx.Staticsrcdir + fmt.Sprintf("%s/%s", app.Name, app.Version)
+					staticPath := path.Join(config.Nginx.Staticdir, fmt.Sprintf("%s_static", app.Name), app.Version)
+					staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
 					CopyFiles(staticPath, staticSrcPath)
 				}
 				delete(self.waiting, taskUUID)
