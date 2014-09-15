@@ -39,8 +39,8 @@ func (self *Levi) WaitTask() {
 		select {
 		case task, ok := <-self.inTask:
 			logger.Debug("levi got task ", task, ok)
-			if !ok {
-				self.Close()
+			if !ok || task == nil {
+				// 有nil或者拿出来的不对, 无视掉
 				break
 			}
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
@@ -76,8 +76,9 @@ func (self *Levi) WaitTask() {
 
 func (self *Levi) Close() {
 	self.wg.Add(1)
-	close(self.inTask)
+	self.inTask <- nil
 	self.closed <- true
+	close(self.inTask)
 	close(self.closed)
 	self.wg.Wait()
 	self.conn.CloseConnection()
