@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -101,12 +102,14 @@ func CreateSha1HexValue(data []byte) string {
 
 // 把src加上dst前缀整个copy
 func CopyFiles(dst, src string) error {
+	logger.Debug("static src: ", src)
+	logger.Debug("static dst: ", dst)
 	if err := os.MkdirAll(dst, 0755); err != nil {
 		return err
 	}
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
 		if info.IsDir() {
-			e := os.Mkdir(dst+path, info.Mode())
+			e := os.Mkdir(path.Join(dst, p), info.Mode())
 			return e
 		} else {
 			d, e := os.Create(dst + path)
