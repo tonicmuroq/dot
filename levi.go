@@ -120,12 +120,17 @@ func (self *Levi) Run() {
 			for taskUUID, taskReplies := range taskReply {
 				tasks, exists := self.waiting[taskUUID]
 				if !exists || (exists && len(tasks) != len(taskReplies)) {
+					logger.Info("task reply is not zippable with tasks, ignore")
 					continue
 				}
 				var app *Application
 				for i := 0; i < len(tasks); i = i + 1 {
 					task := tasks[i]
 					retval := taskReplies[i]
+					if task == nil || retval == nil {
+						logger.Info("task/retval is nil, ignore")
+						continue
+					}
 					switch task.Type {
 					case AddContainer:
 						logger.Debug("Add container Feedback")
