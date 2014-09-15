@@ -147,13 +147,29 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 	return &task
 }
 
-func BuildImageTask(app *Application, group, name, version, base, build string) *Task {
+// build任务的name就是应用的projectname
+// build任务的version就是应用的version, 都是7位的git版本号
+// build任务的build就是应用的build
+// 也就是告诉dot, 我需要用base来构建group下的app应用
+func BuildImageTask(app *Application, group, base string) *Task {
+	if app == nil {
+		return nil
+	}
+	appYaml, err := app.GetAppYaml()
+	if err != nil {
+		logger.Debug("app.yaml error: ", err)
+		return nil
+	}
+	if len(appYaml.Build) == 0 {
+		logger.Debug("build task error: need build in app.yaml")
+		return nil
+	}
 	buildTask := BuildTask{
-		Name:    name,
-		Version: version,
+		Name:    app.Pname,
+		Version: app.Version,
 		Group:   group,
 		Base:    base,
-		Build:   build,
+		Build:   appYaml.Build[0],
 	}
 	task := Task{
 		Name:  app.Name,

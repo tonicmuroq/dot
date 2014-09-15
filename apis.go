@@ -31,7 +31,7 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	encoder.Encode(r)
 }
 
-func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
+func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
@@ -48,7 +48,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		task := AddContainerTask(app, host, false)
 		logger.Debug("add container task ", task)
 		if err := hub.Dispatch(host.IP, task); err != nil {
-			r["r"] = 0
+			r["r"] = 1
 			r["msg"] = err.Error()
 		}
 	}
@@ -56,8 +56,73 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	encoder.Encode(r)
 }
 
-func FinishDispatchHandler(w http.ResponseWriter, req *http.Request) {
+func BuildImageHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+	// 暂时没有monitor, 那么人肉指定host吧
+	ip := req.Form.Get("host")
+
 	r := JsonTmpl{"r": 0, "msg": "ok"}
+	app := GetApplicationByNameAndVersion(name, version)
+	host := GetHostByIP(ip)
+	if app == nil || host == nil {
+		r["r"] = 1
+		r["msg"] = "no such app"
+	} else {
+		group := req.Form.Get("group")
+		base := req.Form.Get("base")
+		task := BuildImageTask(app, group, base)
+		logger.Debug("build image task ", task)
+		if err := hub.Dispatch(host.IP, task); err != nil {
+			r["r"] = 1
+			r["msg"] = err.Error()
+		}
+	}
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
+}
+
+func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+	ips := req.Form["hosts"]
+
+	r := JsonTmpl{"r": 0, "msg": "ok"}
+	app := GetApplicationByNameAndVersion(name, version)
+	hosts := GetHostsByIPs(ips)
+	if app == nil {
+		r["r"] = 1
+		r["msg"] = "no such app"
+	} else {
+		if err := DeployApplicationHelper(app, hosts, false); err != nil {
+			r["r"] = 1
+			r["msg"] = err.Error()
+		}
+	}
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
+}
+
+func RemoveApplicationHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+	ip := req.Form.Get("host")
+
+	r := JsonTmpl{"r": 0, "msg": "ok"}
+	app := GetApplicationByNameAndVersion(name, version)
+	host := GetHostByIP(ip)
+	if app == nil || host == nil {
+		r["r"] = 1
+		r["msg"] = "no such app"
+	} else {
+		if err := RemoveApplicationFromHostHelper(app, host); err != nil {
+			r["r"] = 1
+			r["msg"] = err.Error()
+		}
+	}
 	encoder := json.NewEncoder(w)
 	encoder.Encode(r)
 }
@@ -66,6 +131,8 @@ func init() {
 	restServer = pat.New()
 	restServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
 	restServer.Post("/app/:app/version/:version", http.HandlerFunc(RegisterApplicationHandler))
+	restServer.Post("/app/:app/version/:version/add", http.HandlerFunc(AddContainerHandler))
+	restServer.Post("/app/:app/version/:version/build", http.HandlerFunc(BuildImageHandler))
 	restServer.Post("/app/:app/version/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
-	restServer.Get("/finish", http.HandlerFunc(FinishDispatchHandler))
+	restServer.Post("/app/:app/version/:version/remove", http.HandlerFunc(RemoveApplicationHandler))
 }

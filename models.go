@@ -85,7 +85,7 @@ func init() {
 
 	// for testing
 	NewApplication("blueberry", "11111", `{"appname": "blurry", "runtime": "python", "port": 5000, "cmd": ["pip install"], "services": ["mysql", "redis"]}`, "")
-	NewApplication("nbetest", "4f1c7c2", `{"appname": "nbetest", "runtime": "python", "port": 5000, "cmd": ["python", "app.py"], "services": ["mysql", "redis"]}`, "")
+	NewApplication("nbetest", "4f1c7c2", `{"appname": "nbetest", "runtime": "python", "port": 5000, "cmd": ["python app.py"], "services": ["mysql", "redis"]}`, "")
 	NewHost("127.0.0.1", "tonic")
 }
 
@@ -301,6 +301,15 @@ func GetHostByIP(ip string) *Host {
 	return &host
 }
 
+// 注意里面可能有nil
+func GetHostsByIPs(ips []string) []*Host {
+	hosts := make([]*Host, len(ips))
+	for i, ip := range ips {
+		hosts[i] = GetHostByIP(ip)
+	}
+	return hosts
+}
+
 func (self *Host) Containers() []*Container {
 	var cs []*Container
 	db.QueryTable(new(Container)).Filter("HostId", self.Id).OrderBy("Port").All(&cs)
@@ -372,6 +381,12 @@ func GetContainerByCid(cid string) *Container {
 		return nil
 	}
 	return &container
+}
+
+func GetContainerByHostAndApp(host *Host, app *Application) []*Container {
+	var cs []*Container
+	db.QueryTable(new(Container)).Filter("HostId", host.Id).Filter("AppId", app.Id).OrderBy("Port").All(&cs)
+	return cs
 }
 
 // 获取一个host上的可用的一个端口
