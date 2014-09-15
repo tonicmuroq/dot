@@ -101,17 +101,18 @@ func (self *Levi) SendTasks() {
 
 func (self *Levi) Run() {
 	// 接收数据
+	finish := false
 	defer func() {
 		self.Close()
 		hub.RemoveLevi(self.host)
 	}()
-	for !self.conn.closed {
+	for !finish {
 		var taskReply TaskReply
 		switch err := self.conn.ws.ReadJSON(&taskReply); {
 		case err != nil:
 			if e, ok := err.(net.Error); !ok || !e.Timeout() {
 				logger.Info(err)
-				self.conn.CloseConnection()
+				finish = true
 			}
 		case err == nil:
 			logger.Debug("taskReply", taskReply)

@@ -49,7 +49,7 @@ func (self *Hub) CheckAlive() {
 	for {
 		for host, last := range self.lastCheckTime {
 			duration := time.Since(last)
-			// 如果一个连接不再存在, 那么先关闭连接, 再删掉这个连接
+			// 如果一个连接不再存在, 那么删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
 				logger.Info(host, " is disconnected.")
 				self.RemoveLevi(host)
@@ -136,16 +136,11 @@ func (self *Hub) AddLevi(levi *Levi) {
 	self.lastCheckTime[host] = time.Now()
 }
 
-func (self *Hub) GetLevi(host string) *Levi {
-	return self.levis[host]
-}
-
 func (self *Hub) RemoveLevi(host string) {
 	levi, ok := self.levis[host]
 	if !ok || levi == nil {
 		return
 	}
-	levi.Close()
 	delete(self.levis, host)
 	delete(self.lastCheckTime, host)
 }
@@ -200,19 +195,6 @@ func (self *Connection) Send(payload []byte) error {
 func (self *Connection) CloseConnection() error {
 	self.closed = true
 	return self.ws.Close()
-}
-
-func (self *Connection) Listen() {
-	defer hub.RemoveLevi(self.host)
-	for !self.closed {
-		msg, err := self.Read()
-		if err != nil {
-			logger.Info(err, "Listen")
-			self.CloseConnection()
-		}
-		// TODO action
-		self.Write(websocket.TextMessage, []byte(msg))
-	}
 }
 
 func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
