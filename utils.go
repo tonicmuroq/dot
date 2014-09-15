@@ -112,13 +112,13 @@ func CopyFiles(dst, src string) error {
 			e := os.Mkdir(path.Join(dst, p), info.Mode())
 			return e
 		} else {
-			d, e := os.Create(dst + path)
+			d, e := os.Create(path.Join(dst, p))
 			defer d.Close()
 			if e != nil {
 				return e
 			}
 
-			f, e := os.Open(path)
+			f, e := os.Open(p)
 			defer f.Close()
 			if e != nil {
 				return e
