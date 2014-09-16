@@ -116,6 +116,7 @@ func (self *Levi) Run() {
 				finish = true
 			}
 		case err == nil:
+			cleanWaiting := true
 			for taskUUID, taskReplies := range taskReply {
 				tasks, exists := self.waiting[taskUUID]
 				if !exists || (exists && len(tasks) != len(taskReplies)) {
@@ -167,6 +168,9 @@ func (self *Levi) Run() {
 					case TestApplication:
 						logger.Debug("Test App Feedback")
 						// just ignore all feedback
+						cleanWaiting = false
+					case BuildImage:
+						logger.Debug("Build image")
 					}
 				}
 				// 一次一个appId就够了
@@ -179,7 +183,9 @@ func (self *Levi) Run() {
 					staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
 					CopyFiles(staticPath, staticSrcPath)
 				}
-				delete(self.waiting, taskUUID)
+				if cleanWaiting {
+					delete(self.waiting, taskUUID)
+				}
 			}
 		}
 	}
