@@ -106,7 +106,8 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 		configyaml = "{}"
 	}
 	var appYamlJson AppYaml
-	var oconfigYamlJson, copyConfigYamlJson ConfigYaml
+	var oconfigYamlJson ConfigYaml
+	var copyConfigYamlJson = make(ConfigYaml)
 	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &oconfigYamlJson); err1 != nil || err2 != nil {
 		logger.Debug("app.yaml error: ", err1)
 		logger.Debug("config.yaml error: ", err2)
