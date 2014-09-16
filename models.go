@@ -174,6 +174,13 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 			etcdClient.Create((&app).GetYamlPath("original-config"), configYaml, 0)
 		}
 	}
+	if configYaml, err := YAMLEncode(testConfigYamlJson); err == nil {
+		if len(configYaml) == 0 {
+			etcdClient.Create((&app).GetYamlPath("test"), "", 0)
+		} else {
+			etcdClient.Create((&app).GetYamlPath("test"), configYaml, 0)
+		}
+	}
 
 	// 生成必须路径
 	etcdClient.CreateDir(path.Join(appPathPrefix, "_Apps", app.Name, "daemons"), 0)
