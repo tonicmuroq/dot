@@ -73,7 +73,7 @@ func init() {
 	// mysql
 	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
 	orm.RegisterModel(new(Application), new(User), new(Host), new(Container), new(HostPort))
-	orm.RunSyncdb(config.Db.Name, true, false)
+	orm.RunSyncdb(config.Db.Name, false, false)
 	db = orm.NewOrm()
 
 	// etcd
