@@ -82,11 +82,6 @@ func init() {
 
 	// Mutex
 	portMutex = sync.Mutex{}
-
-	// for testing
-	NewApplication("blueberry", "11111", `{"appname": "blurry", "runtime": "python", "port": 5000, "cmd": ["pip install"], "services": ["mysql", "redis"]}`, "")
-	NewApplication("nbetest", "4f1c7c2", `{"appname": "nbetest", "runtime": "python", "port": 5000, "cmd": ["python app.py"], "services": ["mysql", "redis"]}`, "")
-	NewHost("127.0.0.1", "tonic")
 }
 
 // Application
