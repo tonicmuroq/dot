@@ -100,6 +100,12 @@ func CreateSha1HexValue(data []byte) string {
 	return hex.EncodeToString(x)
 }
 
+func CreateRandomHexString(salt string, length int) string {
+	t := time.Now().String()
+	code := CreateSha1HexValue([]byte(salt + t))
+	return code[:length]
+}
+
 // 把src加上dst前缀整个copy
 func CopyFiles(dst, src string) error {
 	logger.Debug("static src: ", src)

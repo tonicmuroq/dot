@@ -1,7 +1,6 @@
 package main
 
 import (
-	"code.google.com/p/go-uuid/uuid"
 	"strings"
 )
 
@@ -10,6 +9,7 @@ const (
 	RemoveContainer = 2
 	UpdateContainer = 3
 	BuildImage      = 4
+	TestApplication = 4
 )
 
 type BuildTask struct {
@@ -32,6 +32,7 @@ type Task struct {
 	Memory    int
 	Cpus      int
 	Daemon    string
+	Test      string
 	Container string
 	Build     BuildTask
 }
@@ -52,7 +53,7 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 	var daemonId string
 	if daemon {
 		bind = 0
-		daemonId = uuid.New()
+		daemonId = CreateRandomHexString(app.Name, 7)
 	} else {
 		bind = GetPortFromHost(host)
 		daemonId = ""
@@ -113,7 +114,7 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 	var daemonId string
 	if container.DaemonId != "" {
 		bind = 0
-		daemonId = uuid.New()
+		daemonId = CreateRandomHexString(app.Name, 7)
 	} else {
 		bind = GetPortFromHost(host)
 		// 不够端口玩了
@@ -177,5 +178,34 @@ func BuildImageTask(app *Application, group, base string) *Task {
 		Type:  BuildImage,
 		Build: buildTask,
 	}
+	return &task
+}
+
+// test task
+func TestApplicationTask(app *Application, host *Host) *Task {
+	var bind int
+	testId := CreateRandomHexString(app.Name, 7)
+
+	appYaml, err := app.GetAppYaml()
+	if err != nil {
+		logger.Debug("app.yaml error: ", err)
+		return nil
+	}
+	testCmdString := appYaml.Test[0]
+	testCmd := strings.Split(testCmdString, " ")
+	port := appYaml.Port
+
+	task := Task{
+		Name:    strings.ToLower(app.Name),
+		Version: app.Version,
+		Port:    port,
+		Cmd:     testCmd,
+		Host:    host.IP,
+		Type:    TestApplication,
+		Uid:     app.UserUid(),
+		Bind:    bind,
+		Memory:  config.Task.Memory,
+		Cpus:    config.Task.Cpus,
+		Test:    testId}
 	return &task
 }

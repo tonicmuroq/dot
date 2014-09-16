@@ -164,6 +164,9 @@ func (self *Levi) Run() {
 							continue
 						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
+					case TestApplication:
+						logger.Debug("Test App Feedback")
+						// just ignore all feedback
 					}
 				}
 				// 一次一个appId就够了

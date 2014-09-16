@@ -57,8 +57,10 @@ type AppYaml struct {
 	Runtime  string   `json:runtime`
 	Port     int      `json:port`
 	Cmd      []string `json:cmd`
+	Test     []string `json:test`
 	Build    []string `json:build`
 	Services []string `json:services`
+	Static   string   `json:static`
 }
 
 type ConfigYaml map[string]interface{}
@@ -108,6 +110,8 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	var appYamlJson AppYaml
 	var oconfigYamlJson ConfigYaml
 	var copyConfigYamlJson = make(ConfigYaml)
+	var testConfigYamlJson = make(ConfigYaml)
+
 	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &oconfigYamlJson); err1 != nil || err2 != nil {
 		logger.Debug("app.yaml error: ", err1)
 		logger.Debug("config.yaml error: ", err2)
@@ -116,6 +120,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 
 	for k, v := range oconfigYamlJson {
 		copyConfigYamlJson[k] = v
+		testConfigYamlJson[k] = v
 	}
 
 	// 生成新用户
@@ -141,13 +146,18 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 				var d map[string]interface{}
 				if err := JSONDecode(dbInfoString, &d); err == nil {
 					oconfigYamlJson["mysql"] = d
+					// 没得可以分配的, 先写这个吧, 一定会挂
+					testConfigYamlJson["mysql"] = d
 				} else {
 					logger.Info("mysql create failed")
 				}
 			}
 		}
 		if service == "redis" {
-			oconfigYamlJson["redis"] = CreateRedis(&app)
+			d := CreateRedis(&app)
+			oconfigYamlJson["redis"] = d
+			// 同上
+			testConfigYamlJson["mysql"] = d
 		}
 	}
 
