@@ -130,9 +130,9 @@ func RemoveApplicationHandler(w http.ResponseWriter, req *http.Request) {
 func init() {
 	restServer = pat.New()
 	restServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
-	restServer.Post("/app/:app/version/:version", http.HandlerFunc(RegisterApplicationHandler))
-	restServer.Post("/app/:app/version/:version/add", http.HandlerFunc(AddContainerHandler))
-	restServer.Post("/app/:app/version/:version/build", http.HandlerFunc(BuildImageHandler))
-	restServer.Post("/app/:app/version/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
-	restServer.Post("/app/:app/version/:version/remove", http.HandlerFunc(RemoveApplicationHandler))
+	restServer.Post("/app/:app/:version", http.HandlerFunc(RegisterApplicationHandler))
+	restServer.Post("/app/:app/:version/add", http.HandlerFunc(AddContainerHandler))
+	restServer.Post("/app/:app/:version/build", http.HandlerFunc(BuildImageHandler))
+	restServer.Post("/app/:app/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
+	restServer.Post("/app/:app/:version/remove", http.HandlerFunc(RemoveApplicationHandler))
 }
