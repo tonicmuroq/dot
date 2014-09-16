@@ -22,6 +22,9 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	appyaml := req.Form.Get("appyaml")
 	configyaml := req.Form.Get("configyaml")
 
+	logger.Debug("app.yaml: ", appyaml)
+	logger.Debug("config.yaml: ", configyaml)
+
 	r := JsonTmpl{"r": 0, "msg": "ok"}
 	if app := NewApplication(projectname, version, appyaml, configyaml); app == nil {
 		r["r"] = 1
