@@ -9,7 +9,7 @@ const (
 	RemoveContainer = 2
 	UpdateContainer = 3
 	BuildImage      = 4
-	TestApplication = 4
+	TestApplication = 5
 )
 
 type BuildTask struct {
