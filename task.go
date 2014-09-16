@@ -191,6 +191,10 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 		logger.Debug("app.yaml error: ", err)
 		return nil
 	}
+	if len(appYaml.Test) == 0 {
+		logger.Debug("test task error: need test in app.yaml")
+		return nil
+	}
 	testCmdString := appYaml.Test[0]
 	testCmd := strings.Split(testCmdString, " ")
 	port := appYaml.Port
