@@ -129,8 +129,9 @@ func CopyFiles(dst, src string) error {
 		suffix := strings.Replace(p, src, "", 1)
 		newPath := path.Join(dst, suffix)
 		if info.IsDir() {
-			e := os.Mkdir(newPath, info.Mode())
-			return e
+			if e := os.MkdirAll(newPath, info.Mode()); e != nil {
+				return e
+			}
 		} else {
 			d, e := os.Create(newPath)
 			defer d.Close()
