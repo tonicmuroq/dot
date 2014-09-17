@@ -113,6 +113,9 @@ func CreateRandomHexString(salt string, length int) string {
 func CopyFiles(dst, src string) error {
 	logger.Debug("static src: ", src)
 	logger.Debug("static dst: ", dst)
+	if _, err := os.Stat(src); err != nil {
+		return err
+	}
 	if !(filepath.IsAbs(dst) && filepath.IsAbs(src)) {
 		return errors.New("both dst and src should be absolute path")
 	}
