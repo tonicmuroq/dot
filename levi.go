@@ -144,7 +144,6 @@ func (self *Levi) Run() {
 							continue
 						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
-						copyStatics = true
 					case RemoveContainer:
 						logger.Debug("Remove container Feedback")
 						old := GetContainerByCid(task.Container)
@@ -167,13 +166,13 @@ func (self *Levi) Run() {
 							continue
 						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
-						copyStatics = true
 					case TestApplication:
 						logger.Debug("Test App Feedback")
 						// just ignore all feedback
 						cleanWaiting = false
 					case BuildImage:
 						logger.Debug("Build image")
+						copyStatics = true
 					}
 				}
 				// 一次一个appId就够了
