@@ -60,6 +60,7 @@ type AppYaml struct {
 	Test     []string `json:test`
 	Build    []string `json:build`
 	Services []string `json:services`
+	Db       string   `json:db`
 	Static   string   `json:static`
 }
 
