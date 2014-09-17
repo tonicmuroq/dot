@@ -171,6 +171,8 @@ func BuildImageTask(app *Application, group, base string) *Task {
 		Group:   group,
 		Base:    base,
 		Build:   appYaml.Build[0],
+		Static:  appYaml.Static,
+		Schema:  "", // 先来个空的吧
 	}
 	task := Task{
 		Name:  app.Name,
