@@ -117,6 +117,7 @@ func (self *Levi) Run() {
 			}
 		case err == nil:
 			cleanWaiting := true
+			copyStatics := false
 			for taskUUID, taskReplies := range taskReply {
 				tasks, exists := self.waiting[taskUUID]
 				if !exists || (exists && len(tasks) != len(taskReplies)) {
@@ -143,6 +144,7 @@ func (self *Levi) Run() {
 							continue
 						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
+						copyStatics = true
 					case RemoveContainer:
 						logger.Debug("Remove container Feedback")
 						old := GetContainerByCid(task.Container)
@@ -165,6 +167,7 @@ func (self *Levi) Run() {
 							continue
 						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
+						copyStatics = true
 					case TestApplication:
 						logger.Debug("Test App Feedback")
 						// just ignore all feedback
@@ -178,10 +181,12 @@ func (self *Levi) Run() {
 				if app != nil {
 					// 告诉hub任务完成
 					hub.done <- app.Id
-					// 复制静态文件到地址
-					staticPath := path.Join(config.Nginx.Staticdir, fmt.Sprintf("%s_static", app.Name), app.Version)
-					staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
-					CopyFiles(staticPath, staticSrcPath)
+					if copyStatics {
+						// 复制静态文件到地址
+						staticPath := path.Join(config.Nginx.Staticdir, fmt.Sprintf("%s_static", app.Name), app.Version)
+						staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
+						CopyFiles(staticPath, staticSrcPath)
+					}
 				}
 				if cleanWaiting {
 					delete(self.waiting, taskUUID)

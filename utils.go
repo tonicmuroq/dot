@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -106,19 +107,29 @@ func CreateRandomHexString(salt string, length int) string {
 	return code[:length]
 }
 
-// 把src加上dst前缀整个copy
+// 把src copy到dst
+// dst, src必须是绝对路径
+// dst不能是src的子目录, 也就是dst不能有src的前缀
 func CopyFiles(dst, src string) error {
 	logger.Debug("static src: ", src)
 	logger.Debug("static dst: ", dst)
+	if !(filepath.IsAbs(dst) && filepath.IsAbs(src)) {
+		return errors.New("both dst and src should be absolute path")
+	}
+	if strings.HasPrefix(dst, src) {
+		return errors.New("dst can't be child of src")
+	}
 	if err := os.MkdirAll(dst, 0755); err != nil {
 		return err
 	}
 	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
+		suffix := strings.Replace(p, src, "", 1)
+		newPath := path.Join(dst, suffix)
 		if info.IsDir() {
-			e := os.Mkdir(path.Join(dst, p), info.Mode())
+			e := os.Mkdir(newPath, info.Mode())
 			return e
 		} else {
-			d, e := os.Create(path.Join(dst, p))
+			d, e := os.Create(newPath)
 			defer d.Close()
 			if e != nil {
 				return e

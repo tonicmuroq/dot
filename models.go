@@ -60,7 +60,6 @@ type AppYaml struct {
 	Test     []string `json:test`
 	Build    []string `json:build`
 	Services []string `json:services`
-	Db       string   `json:db`
 	Static   string   `json:static`
 }
 
@@ -69,7 +68,6 @@ type ConfigYaml map[string]interface{}
 // models 初始化
 // 连接 mysql
 // 连接 etcd
-// 可能还需要连接 redis
 func init() {
 	// mysql
 	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
