@@ -18,6 +18,8 @@ type BuildTask struct {
 	Group   string
 	Base    string
 	Build   string
+	Static  string
+	Schema  string
 }
 
 type Task struct {
