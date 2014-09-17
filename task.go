@@ -177,7 +177,7 @@ func BuildImageTask(app *Application, group, base string) *Task {
 		Schema:  "", // 先来个空的吧
 	}
 	task := Task{
-		Name:    app.Name,
+		Name:    strings.ToLower(app.Name),
 		Uid:     app.UserUid(),
 		Type:    BuildImage,
 		Build:   buildTask,
