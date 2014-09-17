@@ -79,7 +79,6 @@ func (self *Hub) Run() {
 			}
 			finish = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
-			logger.Debug("Hub time check: ", self.appIds)
 			if len(self.appIds) != 0 {
 				logger.Info("restart nginx")
 				self.RestartNginx()

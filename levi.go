@@ -66,7 +66,6 @@ func (self *Levi) WaitTask() {
 			}
 			finish = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
-			logger.Debug("time check ", self.Len())
 			if self.Len() != 0 {
 				logger.Debug("send tasks")
 				self.SendTasks()
@@ -172,6 +171,11 @@ func (self *Levi) Run() {
 						cleanWaiting = false
 					case BuildImage:
 						logger.Debug("Build image")
+						app = GetApplicationByNameAndVersion(task.Name, task.Version)
+						if app == nil {
+							logger.Info("app/host 没了")
+							continue
+						}
 						copyStatics = true
 					}
 				}
