@@ -17,6 +17,8 @@ task:
     dispatch: 5
     queuesize: 10
     restartsize: 5
+    cpushare: 100
+    cpuset: ""
 nginx:
     template: "templates/nginx.tmpl"
     conf: ""

@@ -22,7 +22,8 @@ type TaskConfig struct {
 	Dispatch  int
 	Queuesize int
 	Memory    int
-	Cpus      int
+	CpuShare  int
+	CpuSet    string
 }
 
 type NginxConfig struct {

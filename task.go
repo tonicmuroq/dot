@@ -32,7 +32,8 @@ type Task struct {
 	Uid       int
 	Bind      int
 	Memory    int
-	Cpus      int
+	CpuShare  int
+	CpuSet    string
 	Daemon    string
 	Test      string
 	Container string
@@ -76,17 +77,18 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 	port := appYaml.Port
 
 	task := Task{
-		Name:    strings.ToLower(app.Name),
-		Version: app.Version,
-		Port:    port,
-		Cmd:     cmd,
-		Host:    host.IP,
-		Type:    AddContainer,
-		Uid:     app.UserUid(),
-		Bind:    bind,
-		Memory:  config.Task.Memory,
-		Cpus:    config.Task.Cpus,
-		Daemon:  daemonId}
+		Name:     strings.ToLower(app.Name),
+		Version:  app.Version,
+		Port:     port,
+		Cmd:      cmd,
+		Host:     host.IP,
+		Type:     AddContainer,
+		Uid:      app.UserUid(),
+		Bind:     bind,
+		Memory:   config.Task.Memory,
+		CpuShare: config.Task.CpuShare,
+		CpuSet:   config.Task.CpuSet,
+		Daemon:   daemonId}
 	return &task
 }
 
@@ -144,7 +146,8 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		Uid:       app.UserUid(),
 		Bind:      bind,
 		Memory:    config.Task.Memory,
-		Cpus:      config.Task.Cpus,
+		CpuShare:  config.Task.CpuShare,
+		CpuSet:    config.Task.CpuSet,
 		Daemon:    daemonId,
 		Container: container.ContainerId}
 	return &task
@@ -205,16 +208,17 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 	port := appYaml.Port
 
 	task := Task{
-		Name:    strings.ToLower(app.Name),
-		Version: app.Version,
-		Port:    port,
-		Cmd:     testCmd,
-		Host:    host.IP,
-		Type:    TestApplication,
-		Uid:     app.UserUid(),
-		Bind:    bind,
-		Memory:  config.Task.Memory,
-		Cpus:    config.Task.Cpus,
-		Test:    testId}
+		Name:     strings.ToLower(app.Name),
+		Version:  app.Version,
+		Port:     port,
+		Cmd:      testCmd,
+		Host:     host.IP,
+		Type:     TestApplication,
+		Uid:      app.UserUid(),
+		Bind:     bind,
+		Memory:   config.Task.Memory,
+		CpuShare: config.Task.CpuShare,
+		CpuSet:   config.Task.CpuSet,
+		Test:     testId}
 	return &task
 }
