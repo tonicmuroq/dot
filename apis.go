@@ -39,6 +39,7 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
+	daemon := req.Form.Get("daemon")
 
 	app := GetApplicationByNameAndVersion(name, version)
 	host := GetHostByIP(ip)
@@ -48,7 +49,7 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "no such app"
 	} else {
-		task := AddContainerTask(app, host, false)
+		task := AddContainerTask(app, host, daemon == "true")
 		logger.Debug("add container task ", task)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
@@ -116,6 +117,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ips := req.Form["hosts"]
+	daemon := req.Form.Get("daemon")
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
 	app := GetApplicationByNameAndVersion(name, version)
@@ -124,7 +126,7 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "no such app"
 	} else {
-		if err := DeployApplicationHelper(app, hosts, false); err != nil {
+		if err := DeployApplicationHelper(app, hosts, daemon == "true"); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
 		}
