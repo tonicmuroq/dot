@@ -199,7 +199,7 @@ func (self *Connection) CloseConnection() error {
 func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 	ws.SetReadLimit(maxMessageSize)
 	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(time.Now().Add(pongWait))
+		ws.SetReadDeadline(0)
 		hub.lastCheckTime[host] = time.Now()
 		return nil
 	})
