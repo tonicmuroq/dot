@@ -109,8 +109,6 @@ func (self *Hub) RestartNginx() {
 			}
 
 			hosts := app.Hosts()
-			logger.Debug("hosts of app: ", len(hosts))
-			logger.Debug("hosts of app: ", hosts)
 
 			if len(hosts) == 0 {
 				EnsureFileAbsent(conf)
