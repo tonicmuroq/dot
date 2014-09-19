@@ -181,7 +181,6 @@ func (self *Connection) Read() ([]byte, error) {
 }
 
 func (self *Connection) Write(mt int, payload []byte) error {
-	self.ws.SetWriteDeadline(time.Now().Add(writeWait))
 	return self.ws.WriteMessage(mt, payload)
 }
 
@@ -200,8 +199,9 @@ func (self *Connection) CloseConnection() error {
 
 func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 	ws.SetReadLimit(maxMessageSize)
+	ws.SetReadDeadline(ZeroTime)
+	ws.SetWriteDeadline(ZeroTime)
 	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(ZeroTime)
 		hub.lastCheckTime[host] = time.Now()
 		return nil
 	})
