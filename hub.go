@@ -26,6 +26,8 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024 * 1024,
 }
 
+var ZeroTime time.Time
+
 // websocket 连接
 type Connection struct {
 	ws     *websocket.Conn
@@ -199,7 +201,7 @@ func (self *Connection) CloseConnection() error {
 func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 	ws.SetReadLimit(maxMessageSize)
 	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(0)
+		ws.SetReadDeadline(ZeroTime)
 		hub.lastCheckTime[host] = time.Now()
 		return nil
 	})
