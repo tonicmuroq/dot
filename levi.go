@@ -189,7 +189,7 @@ func (self *Levi) Run() {
 					if copyStatics {
 						// 复制静态文件到地址
 						appUserUid := app.UserUid()
-						staticPath := path.Join(config.Nginx.Staticdir, fmt.Sprintf("%s_static", app.Name), app.Version)
+						staticPath := path.Join(config.Nginx.Staticdir, app.Name, app.Version)
 						staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
 						if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
 							logger.Info("copy files error: ", err)
