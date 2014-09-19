@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -110,8 +111,9 @@ func (self *Levi) Run() {
 		var taskReply TaskReply
 		switch err := self.conn.ws.ReadJSON(&taskReply); {
 		case err != nil:
+			logger.Info("error type: ", reflect.TypeOf(err))
+			logger.Info("read json error: ", err)
 			if e, ok := err.(net.Error); !ok || !e.Timeout() {
-				logger.Info(err)
 				finish = true
 			}
 		case err == nil:
