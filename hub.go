@@ -42,6 +42,7 @@ type Hub struct {
 	lastCheckTime map[string]time.Time
 	appIds        []int
 	done          chan int
+	immediate     chan bool
 	closed        chan bool
 	size          int
 }
@@ -71,18 +72,23 @@ func (self *Hub) Run() {
 		case appId := <-self.done:
 			self.appIds = append(self.appIds, appId)
 			if len(self.appIds) >= self.size {
-				logger.Info("restart nginx")
+				logger.Info("restart nginx on full")
 				self.RestartNginx()
 			}
 		case <-self.closed:
 			if len(self.appIds) != 0 {
-				logger.Info("restart nginx")
+				logger.Info("restart nginx on close")
 				self.RestartNginx()
 			}
 			finish = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
 			if len(self.appIds) != 0 {
-				logger.Info("restart nginx")
+				logger.Info("restart nginx on schedule")
+				self.RestartNginx()
+			}
+		case <-self.immediate:
+			if len(self.appIds) != 0 {
+				logger.Info("restart nginx immediately")
 				self.RestartNginx()
 			}
 		}
@@ -171,6 +177,7 @@ var hub = &Hub{
 	appIds:        []int{},
 	done:          make(chan int),
 	closed:        make(chan bool),
+	immediate:     make(chan bool),
 	size:          10,
 }
 

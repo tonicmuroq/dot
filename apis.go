@@ -22,9 +22,6 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	appyaml := req.Form.Get("appyaml")
 	configyaml := req.Form.Get("configyaml")
 
-	logger.Debug("app.yaml: ", appyaml)
-	logger.Debug("config.yaml: ", configyaml)
-
 	r := JsonTmpl{"r": 0, "msg": "ok"}
 	if app := NewApplication(projectname, version, appyaml, configyaml); app == nil {
 		r["r"] = 1
@@ -50,7 +47,6 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 		r["msg"] = "no such app"
 	} else {
 		task := AddContainerTask(app, host, daemon == "true")
-		logger.Debug("add container task ", task)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
@@ -77,7 +73,6 @@ func BuildImageHandler(w http.ResponseWriter, req *http.Request) {
 		group := req.Form.Get("group")
 		base := req.Form.Get("base")
 		task := BuildImageTask(app, group, base)
-		logger.Debug("build image task ", task)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
@@ -102,7 +97,6 @@ func TestImageHandler(w http.ResponseWriter, req *http.Request) {
 		r["msg"] = "no such app"
 	} else {
 		task := TestApplicationTask(app, host)
-		logger.Debug("test image task ", task)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
