@@ -37,7 +37,7 @@ func YAMLEncode(v interface{}) (string, error) {
 }
 
 func EnsureDir(path string, owner, group int) error {
-	err := os.Mkdir(path, 0755)
+	err := os.MkdirAll(path, 0755)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,8 @@ func CreateRandomHexString(salt string, length int) string {
 // 把src copy到dst
 // dst, src必须是绝对路径
 // dst不能是src的子目录, 也就是dst不能有src的前缀
-func CopyFiles(dst, src string) error {
+// 同时设置所有权限
+func CopyFiles(dst, src string, uid, gid int) error {
 	logger.Debug("static src: ", src)
 	logger.Debug("static dst: ", dst)
 	if _, err := os.Stat(src); err != nil {
@@ -122,14 +123,14 @@ func CopyFiles(dst, src string) error {
 	if strings.HasPrefix(dst, src) {
 		return errors.New("dst can't be child of src")
 	}
-	if err := os.MkdirAll(dst, 0755); err != nil {
+	if err := EnsureDir(dst, uid, gid); err != nil {
 		return err
 	}
 	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
 		suffix := strings.Replace(p, src, "", 1)
 		newPath := path.Join(dst, suffix)
 		if info.IsDir() {
-			if e := os.MkdirAll(newPath, info.Mode()); e != nil {
+			if e := EnsureDir(newPath, uid, gid); e != nil {
 				return e
 			}
 		} else {
@@ -146,6 +147,9 @@ func CopyFiles(dst, src string) error {
 			}
 
 			io.Copy(d, f)
+			if e := os.Chown(newPath, uid, gid); e != nil {
+				return e
+			}
 		}
 		return err
 	})
