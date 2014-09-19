@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"path"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -17,7 +16,7 @@ type Levi struct {
 	host    string
 	size    int
 	tasks   map[string]*GroupedTask
-	waiting map[string][]*Task
+	waiting map[string]*GroupedTask
 	wg      *sync.WaitGroup
 }
 
@@ -29,9 +28,13 @@ func NewLevi(conn *Connection, size int) *Levi {
 		host:    conn.host,
 		size:    size,
 		tasks:   make(map[string]*GroupedTask),
-		waiting: make(map[string][]*Task),
+		waiting: make(map[string]*GroupedTask),
 		wg:      &sync.WaitGroup{},
 	}
+}
+
+func (self *Levi) Host() *Host {
+	return GetHostByIP(self.host)
 }
 
 func (self *Levi) WaitTask() {
@@ -90,7 +93,7 @@ func (self *Levi) SendTasks() {
 	for _, groupedTask := range self.tasks {
 		go func(groupedTask *GroupedTask) {
 			defer self.wg.Done()
-			self.waiting[groupedTask.Id] = groupedTask.Tasks
+			self.waiting[groupedTask.Id] = groupedTask
 			if err := self.conn.ws.WriteJSON(&groupedTask); err != nil {
 				logger.Info(err, "JSON write error")
 			}
@@ -107,27 +110,27 @@ func (self *Levi) Run() {
 		self.Close()
 		hub.RemoveLevi(self.host)
 	}()
+	host := self.Host()
 	for !finish {
 		var taskReply TaskReply
 		switch err := self.conn.ws.ReadJSON(&taskReply); {
 		case err != nil:
-			logger.Info("error type: ", reflect.TypeOf(err))
 			logger.Info("read json error: ", err)
 			if e, ok := err.(net.Error); !ok || !e.Timeout() {
 				finish = true
 			}
 		case err == nil:
 			cleanWaiting := true
-			copyStatics := false
+
 			for taskUUID, taskReplies := range taskReply {
-				tasks, exists := self.waiting[taskUUID]
-				if !exists || (exists && len(tasks) != len(taskReplies)) {
+				groupedTask, exists := self.waiting[taskUUID]
+				if !exists || (exists && len(groupedTask.Tasks) != len(taskReplies)) {
 					logger.Info("task reply is not zippable with tasks, ignore")
 					continue
 				}
 				var app *Application
-				for i := 0; i < len(tasks); i = i + 1 {
-					task := tasks[i]
+				for i := 0; i < len(groupedTask.Tasks); i = i + 1 {
+					task := groupedTask.Tasks[i]
 					retval := taskReplies[i]
 					logger.Debug("tasks[i]: ", task)
 					logger.Debug("taskReplies[i]: ", retval)
@@ -139,7 +142,6 @@ func (self *Levi) Run() {
 					case AddContainer:
 						logger.Debug("Add container Feedback")
 						app = GetApplicationByNameAndVersion(task.Name, task.Version)
-						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
 							continue
@@ -161,7 +163,6 @@ func (self *Levi) Run() {
 							old.Delete()
 						}
 						app = GetApplicationByNameAndVersion(task.Name, task.Version)
-						host := GetHostByIP(task.Host)
 						if app == nil || host == nil {
 							logger.Info("app/host 没了")
 							continue
@@ -170,24 +171,28 @@ func (self *Levi) Run() {
 					case TestApplication:
 						logger.Debug("Test App Feedback")
 						// just ignore all feedback
-						cleanWaiting = false
+						if v, ok := retval.(string); ok {
+							logger.Debug("testing container id is: ", v)
+							cleanWaiting = false
+						}
 					case BuildImage:
 						logger.Debug("Build image")
-						app = GetApplicationByNameAndVersion(task.Name, task.Version)
-						if app == nil {
-							logger.Info("app/host 没了")
-							continue
-						}
-						copyStatics = true
 					}
 				}
-				// 一次一个appId就够了
-				logger.Debug("levi run app: ", app)
-				if app != nil {
-					// 告诉hub任务完成
+
+				if NeedToRestartNginx(groupedTask.Type) {
 					hub.done <- app.Id
-					if copyStatics {
-						// 复制静态文件到地址
+				}
+
+				switch groupedTask.Type {
+				// case AddContainer:
+				// 暂时忽略这个好了, 影响不会太大
+				case RemoveContainer:
+					if host != nil && len(GetContainerByHostAndApp(host, app)) == 0 {
+						hub.immediate <- true
+					}
+				case BuildImage:
+					if app != nil {
 						appUserUid := app.UserUid()
 						staticPath := path.Join(config.Nginx.Staticdir, app.Name, app.Version)
 						staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
@@ -210,4 +215,8 @@ func (self *Levi) Len() int {
 		count = count + len(value.Tasks)
 	}
 	return count
+}
+
+func NeedToRestartNginx(taskType int) bool {
+	return taskType == AddContainer || taskType == RemoveContainer || taskType == UpdateContainer
 }
