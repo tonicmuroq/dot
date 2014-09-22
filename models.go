@@ -220,6 +220,22 @@ func (self *Application) GetOrCreateDbInfo() string {
 	}
 }
 
+func (self *Application) CreateDNS() error {
+	dns := make(map[string]string)
+	dns["host"] = config.Masteraddr
+	cpath := fmt.Sprintf("/com/hunantv/intra/%s", self.Name)
+	_, err := etcdClient.Create(path, "", 0)
+	if err != nil {
+		return err
+	}
+	if r, err := JSONEncode(dns); err == nil {
+		etcdClient.Set(cpath, r, 0)
+	} else {
+		return err
+	}
+	return nil
+}
+
 func (self *Application) GetYamlPath(cpath string) string {
 	return path.Join(appPathPrefix, self.Name, self.Version, fmt.Sprintf("%s.yaml", cpath))
 }

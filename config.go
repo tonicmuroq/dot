@@ -42,8 +42,9 @@ type DbaConfig struct {
 }
 
 type DotConfig struct {
-	Bind    string
-	Pidfile string
+	Bind       string
+	Pidfile    string
+	Masteraddr string
 
 	Db    DbConfig
 	Etcd  EtcdConfig

@@ -128,6 +128,8 @@ func (self *Hub) RestartNginx() {
 					logger.Info("Render nginx conf failed", err)
 				}
 			}
+
+			app.CreateDNS()
 		}
 	}
 	cmd := exec.Command("nginx", "-s", "reload")
