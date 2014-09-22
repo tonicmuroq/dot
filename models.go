@@ -224,7 +224,7 @@ func (self *Application) CreateDNS() error {
 	dns := make(map[string]string)
 	dns["host"] = config.Masteraddr
 	cpath := fmt.Sprintf("/com/hunantv/intra/%s", self.Name)
-	_, err := etcdClient.Create(path, "", 0)
+	_, err := etcdClient.Create(cpath, "", 0)
 	if err != nil {
 		return err
 	}
