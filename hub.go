@@ -16,8 +16,6 @@ import (
 
 const (
 	checkAliveDuration = 60 * time.Second
-	writeWait          = 10 * time.Second
-	pongWait           = 60 * time.Second
 	maxMessageSize     = 1024 * 1024
 )
 
@@ -45,11 +43,12 @@ type Hub struct {
 	immediate     chan bool
 	closed        chan bool
 	size          int
+	finished      bool
 }
 
 // Hub methods
 func (self *Hub) CheckAlive() {
-	for {
+	for !self.finished {
 		for host, last := range self.lastCheckTime {
 			duration := time.Since(last)
 			// 如果一个连接不再存在, 那么删掉这个连接
@@ -66,8 +65,7 @@ func (self *Hub) CheckAlive() {
 }
 
 func (self *Hub) Run() {
-	finish := false
-	for !finish {
+	for !self.finished {
 		select {
 		case appId := <-self.done:
 			self.appIds = append(self.appIds, appId)
@@ -80,7 +78,7 @@ func (self *Hub) Run() {
 				logger.Info("restart nginx on close")
 				self.RestartNginx()
 			}
-			finish = true
+			self.finished = true
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
 			if len(self.appIds) != 0 {
 				logger.Info("restart nginx on schedule")
@@ -181,6 +179,7 @@ var hub = &Hub{
 	closed:        make(chan bool),
 	immediate:     make(chan bool),
 	size:          10,
+	finished:      false,
 }
 
 // Connection methods

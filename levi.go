@@ -3,7 +3,6 @@ package main
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"fmt"
-	"net"
 	"path"
 	"sync"
 	"time"
@@ -44,9 +43,13 @@ func (self *Levi) WaitTask() {
 		select {
 		case task, ok := <-self.inTask:
 			logger.Debug("levi got task ", task, ok)
-			if !ok || task == nil {
-				// 有nil或者拿出来的不对, 无视掉
+			if task == nil {
+				// 有nil, 无视掉
 				break
+			}
+			if !ok {
+				// 有错, 关掉
+				finish = true
 			}
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
 			if _, exists := self.tasks[key]; !exists {
@@ -116,9 +119,7 @@ func (self *Levi) Run() {
 		switch err := self.conn.ws.ReadJSON(&taskReply); {
 		case err != nil:
 			logger.Info("read json error: ", err)
-			if e, ok := err.(net.Error); !ok || !e.Timeout() {
-				finish = true
-			}
+			finish = true
 		case err == nil:
 			cleanWaiting := true
 
