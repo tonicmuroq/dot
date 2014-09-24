@@ -21,6 +21,10 @@ server {
         break;
     }
 
+    location ~ \.(js|css|jpg|png)$ {
+        root {{.Path}};
+    }
+
     # location ~* (40x.html|50x.html)$ {
     #     internal;
     #     root /data/etc/nginx/html/;

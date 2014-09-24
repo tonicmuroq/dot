@@ -100,9 +100,11 @@ func (self *Hub) RestartNginx() {
 			conf := path.Join(config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
 			var data = struct {
 				Name  string
+				Path  string
 				Hosts []string
 			}{
 				Name:  app.Name,
+				Path:  path.Join(config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", app.Name, app.Version)),
 				Hosts: []string{},
 			}
 
