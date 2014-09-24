@@ -178,6 +178,11 @@ func (self *Levi) Run() {
 						}
 					case BuildImage:
 						logger.Debug("Build image")
+						app = GetApplicationByNameAndVersion(task.Name, task.Version)
+						if app == nil {
+							logger.Info("app 没了")
+							continue
+						}
 					}
 				}
 
