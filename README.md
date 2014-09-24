@@ -73,3 +73,42 @@ Dot 有一个配置文件, `dot.yaml.sample`, 运行的时候只需要重命名�
 ## 怎么部署 Dot 呢?
 
 目前采用手动部署的方式, 写在 init.d 里. 可以使用 supervisord 也可以使用 nohup 来运行, 只是后者会比较 low 一点, 而前者坑会比较多一些.
+
+## Restful APIs
+
+目前支持的 API 都是对系统进行修改的, 暂时没有权限鉴定.
+
+* Register:
+
+        POST /app/:app/:version appyaml=&configyaml=
+        
+    appyaml: 必须传
+    configyaml: 可以为空
+    
+* Add Container:
+
+        POST /app/:app/:version/add host=&daemon=
+        
+    host: 必须传, 说明部署到哪个 host 上
+    daemon: 默认为 false, 如果应用以 daemon 模式运行, 那么传 true
+    
+* Build Image:
+
+        POST /app/:app/:version/build host=&base=&group=
+        
+    host: 用哪个 host 来运行打包任务
+    base: 基于哪个基底镜像
+    group: 代码仓库在哪个组下面
+    
+* Test Image:
+
+        POST /app/:app/:version/test host=
+        
+    host: 用哪个 host 来运行测试任务
+    
+* Remove Application:
+
+        ~~DELETE /app/:app/:version host=~~
+        POST /app/:app/:version/delete host=
+        
+    host: 删除这个 host 上的所有对应 app 的容器
