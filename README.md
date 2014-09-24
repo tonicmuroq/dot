@@ -108,7 +108,7 @@ Dot 有一个配置文件, `dot.yaml.sample`, 运行的时候只需要重命名�
     
 * Remove Application:
 
-        ~~DELETE /app/:app/:version host=~~
         POST /app/:app/:version/delete host=
+        # 其实应该用 DELETE /app/:app/:version host=
         
     host: 删除这个 host 上的所有对应 app 的容器
