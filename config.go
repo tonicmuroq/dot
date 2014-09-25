@@ -45,6 +45,8 @@ type DotConfig struct {
 	Bind       string
 	Pidfile    string
 	Masteraddr string
+	Minport    int
+	Maxport    int
 
 	Db    DbConfig
 	Etcd  EtcdConfig

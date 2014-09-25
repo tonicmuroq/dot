@@ -1,6 +1,8 @@
 bind: "localhost:5000"
 pidfile: "/var/run/dot.pid"
 masteraddr: "10.1.201.99"
+minport: 49000
+maxport: 49999
 db:
     name: "default"
     use: "mysql"

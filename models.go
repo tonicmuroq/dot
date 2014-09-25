@@ -425,31 +425,29 @@ func GetContainerByHostAndApp(host *Host, app *Application) []*Container {
 // 如果超出范围就返回0
 // 只允许一个访问
 func GetPortFromHost(host *Host) int {
+	lowerBound, upperBound := config.Minport, config.Maxport+1
 	portMutex.Lock()
 	defer portMutex.Unlock()
-	newPort := 49000
+	portList := make([]int, upperBound-lowerBound)
+	newPort := lowerBound
 
-	ports := host.Ports()
-	length := len(ports)
-	if length > 0 {
-		var i int
-		for i = 1; i < length; i = i + 1 {
-			tmpPort := ports[i-1]
-			if tmpPort+1 != ports[i] {
-				newPort = tmpPort + 1
-				break
-			}
+	for _, port := range host.Ports() {
+		index := port - lowerBound
+		if index >= len(portList) || index < 0 {
+			continue
 		}
-		if i == length {
-			newPort = ports[i-1] + 1
+		portList[index] = port
+	}
+	for index, hold := range portList {
+		if hold == 0 {
+			newPort = lowerBound + index
+			break
 		}
 	}
-
-	if newPort >= 50000 {
+	if newPort >= upperBound {
 		return 0
 	} else {
 		host.AddPort(newPort)
 	}
-
 	return newPort
 }
