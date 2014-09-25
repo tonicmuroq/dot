@@ -186,7 +186,7 @@ func (self *Levi) Run() {
 					}
 				}
 
-				if NeedToRestartNginx(groupedTask.Type) {
+				if NeedToRestartNginx(groupedTask.Type) && app != nil {
 					hub.done <- app.Id
 				}
 
