@@ -48,7 +48,7 @@ func EnsureFileAbsent(path string) error {
 	return os.Remove(path)
 }
 
-func CreateDatabase(app *Application) (map[string]interface{}, error) {
+func CreateMySQL(app *Application) (map[string]interface{}, error) {
 	// TODO 接入数据库
 	// businessCode := app.Name
 	// dbName := app.Name
@@ -84,12 +84,12 @@ func CreateDatabase(app *Application) (map[string]interface{}, error) {
 	}
 }
 
-func CreateRedis(app *Application) map[string]interface{} {
+func CreateRedis(app *Application) (map[string]interface{}, error) {
 	// TODO 接入redis
 	r := make(map[string]interface{})
-	r["host"] = "localhost"
-	r["port"] = 6379
-	return r
+	r["host"] = "10.1.201.88"
+	r["port"] = time.Now().Nanosecond()%13 + 2000
+	return r, nil
 }
 
 func CreateSha1HexValue(data []byte) string {

@@ -143,7 +143,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	// 配置文件更改
 	for _, service := range appYamlJson.Services {
 		if service == "mysql" {
-			if dbInfoString := app.GetOrCreateDbInfo(); dbInfoString != "" {
+			if dbInfoString := app.GetOrCreateDbInfo("mysql", CreateMySQL); dbInfoString != "" {
 				var d map[string]interface{}
 				if err := JSONDecode(dbInfoString, &d); err == nil {
 					oconfigYamlJson["mysql"] = d
@@ -155,10 +155,16 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 			}
 		}
 		if service == "redis" {
-			d := CreateRedis(&app)
-			oconfigYamlJson["redis"] = d
-			// 同上
-			testConfigYamlJson["mysql"] = d
+			if dbInfoString := app.GetOrCreateDbInfo("redis", CreateRedis); dbInfoString != "" {
+				var d map[string]interface{}
+				if err := JSONDecode(dbInfoString, &d); err == nil {
+					oconfigYamlJson["redis"] = d
+					// 没得可以分配的, 先写这个吧, 一定会挂
+					testConfigYamlJson["redis"] = d
+				} else {
+					logger.Info("redis create failed")
+				}
+			}
 		}
 	}
 
@@ -200,10 +206,10 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 	return &app
 }
 
-func (self *Application) GetOrCreateDbInfo() string {
-	cpath := path.Join(appPathPrefix, self.Name, "mysql")
+func (self *Application) GetOrCreateDbInfo(kind string, createFunction func(*Application) (map[string]interface{}, error)) string {
+	cpath := path.Join(appPathPrefix, self.Name, kind)
 	if _, err := etcdClient.Create(cpath, "", 0); err == nil {
-		db, err := CreateDatabase(self)
+		db, err := createFunction(self)
 		if err != nil {
 			return ""
 		}
