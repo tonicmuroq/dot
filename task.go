@@ -10,6 +10,7 @@ const (
 	UpdateContainer = 3
 	BuildImage      = 4
 	TestApplication = 5
+	HostInfo        = 6
 )
 
 type BuildTask struct {
@@ -220,4 +221,18 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 		CpuSet:   config.Task.CpuSet,
 		Test:     testId}
 	return &task
+}
+
+// host info task
+func HostInfoTask(host *Host) *Task {
+	if host == nil {
+		return nil
+	}
+	return &Task{
+		Name:    "__host_info__",
+		Version: "__info_version__",
+		Host:    host.IP,
+		Type:    HostInfo,
+		Uid:     0,
+	}
 }
