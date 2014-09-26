@@ -9,26 +9,28 @@ import (
 )
 
 type Levi struct {
-	conn    *Connection
-	inTask  chan *Task
-	closed  chan bool
-	host    string
-	size    int
-	tasks   map[string]*GroupedTask
-	waiting map[string]*GroupedTask
-	wg      *sync.WaitGroup
+	conn      *Connection
+	inTask    chan *Task
+	closed    chan bool
+	immediate chan bool
+	host      string
+	size      int
+	tasks     map[string]*GroupedTask
+	waiting   map[string]*GroupedTask
+	wg        *sync.WaitGroup
 }
 
 func NewLevi(conn *Connection, size int) *Levi {
 	return &Levi{
-		conn:    conn,
-		inTask:  make(chan *Task),
-		closed:  make(chan bool),
-		host:    conn.host,
-		size:    size,
-		tasks:   make(map[string]*GroupedTask),
-		waiting: make(map[string]*GroupedTask),
-		wg:      &sync.WaitGroup{},
+		conn:      conn,
+		inTask:    make(chan *Task),
+		closed:    make(chan bool),
+		immediate: make(chan bool),
+		host:      conn.host,
+		size:      size,
+		tasks:     make(map[string]*GroupedTask),
+		waiting:   make(map[string]*GroupedTask),
+		wg:        &sync.WaitGroup{},
 	}
 }
 
@@ -63,18 +65,23 @@ func (self *Levi) WaitTask() {
 			}
 			self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
 			if self.Len() >= self.size {
-				logger.Debug("send tasks")
+				logger.Debug("send tasks when full")
 				self.SendTasks()
 			}
 		case <-self.closed:
 			if self.Len() != 0 {
-				logger.Debug("send tasks")
+				logger.Debug("send tasks before close")
 				self.SendTasks()
 			}
 			finish = true
+		case <-self.immediate:
+			if self.Len() > 0 {
+				logger.Debug("send tasks immediate")
+				self.SendTasks()
+			}
 		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
 			if self.Len() != 0 {
-				logger.Debug("send tasks")
+				logger.Debug("send tasks when timeout")
 				self.SendTasks()
 			}
 		}
@@ -87,6 +94,7 @@ func (self *Levi) Close() {
 	self.closed <- true
 	close(self.inTask)
 	close(self.closed)
+	close(self.immediate)
 	self.wg.Wait()
 	self.conn.CloseConnection()
 }
@@ -125,13 +133,32 @@ func (self *Levi) Run() {
 
 			for taskUUID, taskReplies := range taskReply {
 
-				// test if it's special command
+				// 如果 taskUUID 是一个特殊命令
+				// 那么根据特殊命令做出回应, 不再执行下面的步骤
 				if taskUUID == "__status__" {
+					logger.Info("special commands")
 					continue
-					// do special command
 				}
+
+				// 普通任务的返回值
 				groupedTask, exists := self.waiting[taskUUID]
-				if !exists || (exists && len(groupedTask.Tasks) != len(taskReplies)) {
+				if !exists {
+					logger.Info("not exists, ignore")
+					continue
+				}
+
+				// 如果这个任务是获取容器信息, 那么根据返回值来更新容器状态
+				// 由于返回值的数量会比任务数量要多, 因此直接执行
+				// 不再执行下面的步骤
+				if groupedTask.Type == HostInfo {
+					logger.Info("update container status base on result")
+					continue
+				}
+
+				// 普通的任务和返回值数量对等的任务
+				// 包括 AddContainer, RemoveContainer, UpdateContainer,
+				// BuildImage, TestApplication
+				if len(groupedTask.Tasks) != len(taskReplies) {
 					logger.Info("task reply is not zippable with tasks, ignore")
 					continue
 				}
