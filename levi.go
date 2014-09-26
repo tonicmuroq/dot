@@ -138,7 +138,6 @@ func (self *Levi) Run() {
 				// 那么根据特殊命令做出回应, 不再执行下面的步骤
 				if taskUUID == "__status__" {
 					logger.Info("special commands")
-					// TODO 执行特殊命令
 					UpdateContainerStatus(host, taskReplies)
 					continue
 				}
@@ -155,8 +154,9 @@ func (self *Levi) Run() {
 				// 不再执行下面的步骤
 				if groupedTask.Type == HostInfo {
 					logger.Info("update container status base on result")
-					// TODO 更新容器状态
 					UpdateContainerStatus(host, taskReplies)
+					// 因为不再往下执行于是需要删除这个记录
+					delete(self.waiting, taskUUID)
 					continue
 				}
 
