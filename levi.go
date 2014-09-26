@@ -53,14 +53,15 @@ func (self *Levi) WaitTask() {
 				// 有错, 关掉
 				finish = true
 			}
-			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Type)
+			key := fmt.Sprintf("%s:%s:%s:%s", task.Name, task.Uid, task.Type, task.Version)
 			if _, exists := self.tasks[key]; !exists {
 				self.tasks[key] = &GroupedTask{
-					Name:  task.Name,
-					Uid:   task.Uid,
-					Type:  task.Type,
-					Id:    uuid.New(),
-					Tasks: []*Task{},
+					Name:    task.Name,
+					Uid:     task.Uid,
+					Type:    task.Type,
+					Id:      uuid.New(),
+					Version: task.Version,
+					Tasks:   []*Task{},
 				}
 			}
 			self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
@@ -137,6 +138,7 @@ func (self *Levi) Run() {
 				// 那么根据特殊命令做出回应, 不再执行下面的步骤
 				if taskUUID == "__status__" {
 					logger.Info("special commands")
+					// TODO 执行特殊命令
 					continue
 				}
 
@@ -152,6 +154,7 @@ func (self *Levi) Run() {
 				// 不再执行下面的步骤
 				if groupedTask.Type == HostInfo {
 					logger.Info("update container status base on result")
+					// TODO 更新容器状态
 					continue
 				}
 
@@ -162,84 +165,71 @@ func (self *Levi) Run() {
 					logger.Info("task reply is not zippable with tasks, ignore")
 					continue
 				}
-				var app *Application
+				app := GetApplicationByNameAndVersion(groupedTask.Name, groupedTask.Version)
+				if app == nil {
+					logger.Info("app 没了")
+					continue
+				}
+
 				for i := 0; i < len(groupedTask.Tasks); i = i + 1 {
-					task := groupedTask.Tasks[i]
-					retval := taskReplies[i]
+					task, retval := groupedTask.Tasks[i], taskReplies[i]
+
 					logger.Debug("tasks[i]: ", task)
 					logger.Debug("taskReplies[i]: ", retval)
+
 					if task == nil || retval == nil {
 						logger.Info("task/retval is nil, ignore")
 						continue
 					}
+
+					logger.Debug("Task Feedback", task.Type)
+
 					switch task.Type {
 					case AddContainer:
-						logger.Debug("Add container Feedback")
-						app = GetApplicationByNameAndVersion(task.Name, task.Version)
-						if app == nil || host == nil {
-							logger.Info("app/host 没了")
-							continue
-						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
 					case RemoveContainer:
-						logger.Debug("Remove container Feedback")
-						old := GetContainerByCid(task.Container)
-						app = old.Application()
-						if old == nil || app == nil {
-							logger.Info("要删的容器已经不在了")
-							continue
-						}
-						old.Delete()
-					case UpdateContainer:
-						logger.Debug("Update container Feedback")
-						old := GetContainerByCid(task.Container)
-						if old != nil {
+						if old := GetContainerByCid(task.Container); old != nil {
 							old.Delete()
+						} else {
+							logger.Info("要删的容器已经不在了")
 						}
-						app = GetApplicationByNameAndVersion(task.Name, task.Version)
-						if app == nil || host == nil {
-							logger.Info("app/host 没了")
-							continue
+					case UpdateContainer:
+						if old := GetContainerByCid(task.Container); old != nil {
+							old.Delete()
 						}
 						NewContainer(app, host, task.Bind, retval.(string), task.Daemon)
 					case TestApplication:
-						logger.Debug("Test App Feedback")
-						// just ignore all feedback
+						// 测试的第一次返回是用于测试的容器id, ignore
 						if v, ok := retval.(string); ok {
 							logger.Debug("testing container id is: ", v)
 							cleanWaiting = false
-						}
-					case BuildImage:
-						logger.Debug("Build image")
-						app = GetApplicationByNameAndVersion(task.Name, task.Version)
-						if app == nil {
-							logger.Info("app 没了")
-							continue
+							// 测试的第二次返回是测试的结果
+						} else if _, ok := retval.(map[string]interface{}); ok {
+							// TODO 记录测试结果
 						}
 					}
 				}
 
-				if NeedToRestartNginx(groupedTask.Type) && app != nil {
+				if NeedToRestartNginx(groupedTask.Type) {
 					hub.done <- app.Id
 				}
 
 				switch groupedTask.Type {
-				// case AddContainer:
-				// 暂时忽略这个好了, 影响不会太大
 				case RemoveContainer:
-					if host != nil && len(GetContainerByHostAndApp(host, app)) == 0 {
+					if len(GetContainerByHostAndApp(host, app)) == 0 {
 						hub.immediate <- true
 					}
 				case BuildImage:
-					if app != nil {
-						appUserUid := app.UserUid()
-						staticPath := path.Join(config.Nginx.Staticdir, app.Name, app.Version)
-						staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
-						if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
-							logger.Info("copy files error: ", err)
-						}
+					appUserUid := app.UserUid()
+					staticPath := path.Join(config.Nginx.Staticdir, app.Name, app.Version)
+					staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
+					if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
+						logger.Info("copy files error: ", err)
 					}
 				}
+
+				// 测试第一次返回并不清空任务
+				// TODO 一个变量只给测试用太浪费
 				if cleanWaiting {
 					delete(self.waiting, taskUUID)
 				}

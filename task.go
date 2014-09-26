@@ -42,11 +42,12 @@ type Task struct {
 }
 
 type GroupedTask struct {
-	Name  string
-	Uid   int
-	Id    string
-	Type  int
-	Tasks []*Task
+	Name    string
+	Uid     int
+	Id      string
+	Type    int
+	Version string
+	Tasks   []*Task
 }
 
 type TaskReply map[string][]interface{}
