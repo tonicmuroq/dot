@@ -139,7 +139,7 @@ func (self *Levi) Run() {
 				if taskUUID == "__status__" {
 					logger.Info("special commands")
 					// TODO 执行特殊命令
-					UpdateContainerStatus(taskReplies)
+					UpdateContainerStatus(host, taskReplies)
 					continue
 				}
 
@@ -156,7 +156,7 @@ func (self *Levi) Run() {
 				if groupedTask.Type == HostInfo {
 					logger.Info("update container status base on result")
 					// TODO 更新容器状态
-					UpdateContainerStatus(taskReplies)
+					UpdateContainerStatus(host, taskReplies)
 					continue
 				}
 
@@ -252,7 +252,7 @@ func NeedToRestartNginx(taskType int) bool {
 	return taskType == AddContainer || taskType == RemoveContainer || taskType == UpdateContainer
 }
 
-func UpdateContainerStatus(taskReplies []interface{}) {
+func UpdateContainerStatus(host *Host, taskReplies []interface{}) {
 	for _, v := range taskReplies {
 		if r, ok := v.(map[string]interface{}); ok {
 			typ := r["Type"].(string)
@@ -261,6 +261,11 @@ func UpdateContainerStatus(taskReplies []interface{}) {
 			logger.Debug("container status: ", typ, name, id)
 			if typ == "die" {
 				logger.Info("Should delete ", id, " of ", name)
+				if c := GetContainerByCid(id); c != nil {
+					hub.Dispatch(host.IP, RemoveContainerTask(c))
+				} else {
+					logger.Info("Container ", id, " already removed")
+				}
 			}
 		} else {
 			continue
