@@ -259,6 +259,9 @@ func UpdateContainerStatus(taskReplies []interface{}) {
 			name := r["Appname"].(string)
 			id := r["Id"].(string)
 			logger.Debug("container status: ", typ, name, id)
+			if typ == "die" {
+				logger.Info("Should delete ", id, " of ", name)
+			}
 		} else {
 			continue
 		}
