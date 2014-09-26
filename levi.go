@@ -124,6 +124,12 @@ func (self *Levi) Run() {
 			cleanWaiting := true
 
 			for taskUUID, taskReplies := range taskReply {
+
+				// test if it's special command
+				if taskUUID == "__status__" {
+					continue
+					// do special command
+				}
 				groupedTask, exists := self.waiting[taskUUID]
 				if !exists || (exists && len(groupedTask.Tasks) != len(taskReplies)) {
 					logger.Info("task reply is not zippable with tasks, ignore")
