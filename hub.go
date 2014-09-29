@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/CMGS/websocket"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/CMGS/websocket"
 )
 
 const (

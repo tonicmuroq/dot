@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/bmizerany/pat"
 	"io"
 	"net/http"
+
+	"github.com/bmizerany/pat"
 )
 
 var restServer *pat.PatternServeMux

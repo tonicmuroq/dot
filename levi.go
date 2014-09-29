@@ -1,11 +1,12 @@
 package main
 
 import (
-	"code.google.com/p/go-uuid/uuid"
 	"fmt"
 	"path"
 	"sync"
 	"time"
+
+	"code.google.com/p/go-uuid/uuid"
 )
 
 type Levi struct {

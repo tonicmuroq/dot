@@ -3,11 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"path"
+	"sync"
+
 	"github.com/astaxie/beego/orm"
 	"github.com/coreos/go-etcd/etcd"
 	_ "github.com/go-sql-driver/mysql"
-	"path"
-	"sync"
 )
 
 const (
