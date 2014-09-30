@@ -25,3 +25,19 @@ func RemoveApplicationFromHostHelper(app *Application, host *Host) error {
 	}
 	return err
 }
+
+func UpdateApplicationHelper(fromApp, toApp *Application, hosts []*Host) error {
+	var err error
+	for _, host := range hosts {
+		if host == nil {
+			continue
+		}
+		oldContainers := GetContainerByHostAndApp(host, fromApp)
+		if len(oldContainers) > 0 {
+			for _, c := range oldContainers {
+				err = hub.Dispatch(host.IP, UpdateContainerTask(c, toApp))
+			}
+		}
+	}
+	return err
+}
