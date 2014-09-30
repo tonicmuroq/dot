@@ -19,7 +19,7 @@ func HelloServer(w http.ResponseWriter, req *http.Request) {
 
 func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
-	projectname := req.URL.Query().Get(":app")
+	projectname := req.URL.Query().Get(":projectname")
 	version := req.URL.Query().Get(":version")
 	appyaml := req.Form.Get("appyaml")
 	configyaml := req.Form.Get("configyaml")
@@ -47,6 +47,9 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 	if app == nil || host == nil {
 		r["r"] = 1
 		r["msg"] = "no such app"
+	} else if appyaml, err := app.GetAppYaml(); err != nil || (appyaml.Port == 0 && !appyaml.Daemon) {
+		r["r"] = 1
+		r["msg"] = "app port is 0 or no daemon"
 	} else {
 		task := AddContainerTask(app, host, daemon == "true")
 		if err := hub.Dispatch(host.IP, task); err != nil {
@@ -183,7 +186,7 @@ func UpdateApplicationHandler(w http.ResponseWriter, req *http.Request) {
 func init() {
 	restServer = pat.New()
 	restServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
-	restServer.Post("/app/:app/:version", http.HandlerFunc(RegisterApplicationHandler))
+	restServer.Post("/app/:projectname/:version", http.HandlerFunc(RegisterApplicationHandler))
 	restServer.Post("/app/:app/:version/add", http.HandlerFunc(AddContainerHandler))
 	restServer.Post("/app/:app/:version/build", http.HandlerFunc(BuildImageHandler))
 	restServer.Post("/app/:app/:version/test", http.HandlerFunc(TestImageHandler))
