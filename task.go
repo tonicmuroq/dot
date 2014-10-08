@@ -53,10 +53,18 @@ type GroupedTask struct {
 type TaskReply map[string][]interface{}
 
 // Task
-func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
+func AddContainerTask(app *Application, host *Host) *Task {
+
+	appYaml, err := app.GetAppYaml()
+	if err != nil {
+		logger.Debug("app.yaml error: ", err)
+		return nil
+	}
+
 	var bind int
 	var daemonId string
-	if daemon {
+
+	if appYaml.Daemon {
 		bind = 0
 		daemonId = CreateRandomHexString(app.Name, 7)
 	} else {
@@ -68,11 +76,6 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 		}
 	}
 
-	appYaml, err := app.GetAppYaml()
-	if err != nil {
-		logger.Debug("app.yaml error: ", err)
-		return nil
-	}
 	cmdString := appYaml.Cmd[0]
 	cmd := strings.Split(cmdString, " ")
 	port := appYaml.Port
