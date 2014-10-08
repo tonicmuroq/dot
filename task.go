@@ -97,6 +97,7 @@ func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
 	for _, task := range self.Tasks {
 		switch task.Type {
 		case AddContainer:
+			lt.Add = append(lt.Add, task.ToAddTask())
 		case TestApplication:
 			lt.Add = append(lt.Add, task.ToAddTask())
 		case RemoveContainer:
