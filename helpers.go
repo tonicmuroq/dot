@@ -1,6 +1,6 @@
 package main
 
-func DeployApplicationHelper(app *Application, hosts []*Host, daemon bool) error {
+func DeployApplicationHelper(app *Application, hosts []*Host) error {
 	var err error
 	for _, host := range hosts {
 		if host == nil {
@@ -8,7 +8,7 @@ func DeployApplicationHelper(app *Application, hosts []*Host, daemon bool) error
 		}
 		cs := GetContainerByHostAndApp(host, app)
 		if len(cs) == 0 {
-			err = hub.Dispatch(host.IP, AddContainerTask(app, host, daemon))
+			err = hub.Dispatch(host.IP, AddContainerTask(app, host))
 		} else {
 			for _, c := range cs {
 				err = hub.Dispatch(host.IP, UpdateContainerTask(c, app))
