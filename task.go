@@ -77,28 +77,46 @@ type LeviTasks struct {
 }
 
 type LeviGroupedTask struct {
-	Id    string
-	Uid   int
-	Name  string
-	Info  bool
-	Tasks *LeviTasks
+	Id      string
+	Uid     int
+	Name    string
+	Version string
+	Info    bool
+	Tasks   *LeviTasks
 }
 
-type TaskReply map[string][]interface{}
+type TestResult struct {
+	ExitCode int
+	Err      string
+}
+
+type StatusInfo struct {
+	Type    string
+	Appname string
+	Id      string
+}
+
+type TaskReply struct {
+	Id     string
+	Build  []string
+	Add    []string
+	Remove []bool
+	Test   map[string]*TestResult
+	Status []*StatusInfo
+}
 
 func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
 	lgt := &LeviGroupedTask{
-		Id:   self.Id,
-		Uid:  self.Uid,
-		Name: self.Name,
-		Info: false,
+		Id:      self.Id,
+		Uid:     self.Uid,
+		Name:    self.Name,
+		Version: self.Version,
+		Info:    false,
 	}
 	lt := &LeviTasks{}
 	for _, task := range self.Tasks {
 		switch task.Type {
-		case AddContainer:
-			lt.Add = append(lt.Add, task.ToAddTask())
-		case TestApplication:
+		case AddContainer, TestApplication:
 			lt.Add = append(lt.Add, task.ToAddTask())
 		case RemoveContainer:
 			lt.Remove = append(lt.Remove, task.ToRemoveTask())
