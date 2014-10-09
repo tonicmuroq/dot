@@ -54,12 +54,11 @@ func (self *Levi) WaitTask() {
 				// 有错, 关掉
 				finish = true
 			}
-			key := fmt.Sprintf("%s:%s:%s:%s", task.Name, task.Uid, task.Type, task.Version)
+			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Version)
 			if _, exists := self.tasks[key]; !exists {
 				self.tasks[key] = &GroupedTask{
 					Name:    task.Name,
 					Uid:     task.Uid,
-					Type:    task.Type,
 					Id:      uuid.New(),
 					Version: task.Version,
 					Tasks:   []*Task{},
@@ -137,7 +136,7 @@ func (self *Levi) Run() {
 
 			// 如果 taskUUID 是一个特殊命令
 			// 那么根据特殊命令做出回应, 不再执行下面的步骤
-			if taskUUID == "__status__" {
+			if taskUUID == "__STATUS__" {
 				logger.Info("special commands")
 				UpdateContainerStatus(host, taskReply.Status)
 				continue
@@ -161,6 +160,10 @@ func (self *Levi) Run() {
 				continue
 			}
 
+			if taskReply.Test != nil {
+				logger.Info("test result ", taskReply.Test)
+			}
+
 			// 普通的任务和返回值数量对等的任务
 			// 包括 AddContainer, RemoveContainer, UpdateContainer,
 			// BuildImage, TestApplication
@@ -171,55 +174,9 @@ func (self *Levi) Run() {
 			}
 
 			lt := lgt.Tasks
-
-			for i := 0; i < len(lt.Add); i = i + 1 {
-				task, retval := lt.Add[i], taskReply.Add[i]
-
-				logger.Debug("tasks[i]: ", task)
-				logger.Debug("taskReplies[i]: ", retval)
-
-				if task == nil || retval == "" {
-					logger.Info("task/retval is nil, ignore")
-					continue
-				}
-
-				NewContainer(app, host, task.Bind, retval, task.Daemon)
-			}
-			for i := 0; i < len(lt.Build); i = i + 1 {
-				task, retval := lt.Build[i], taskReply.Build[i]
-
-				logger.Debug("tasks[i]: ", task)
-				logger.Debug("taskReplies[i]: ", retval)
-
-				if task == nil || retval == "" {
-					logger.Info("task/retval is nil, ignore")
-					continue
-				}
-
-				appUserUid := app.UserUid()
-				staticPath := path.Join(config.Nginx.Staticdir, app.Name, app.Version)
-				staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
-				if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
-					logger.Info("copy files error: ", err)
-				}
-			}
-			for i := 0; i < len(lt.Remove); i = i + 1 {
-				task, retval := lt.Remove[i], taskReply.Remove[i]
-
-				logger.Debug("tasks[i]: ", task)
-				logger.Debug("taskReplies[i]: ", retval)
-
-				if task == nil || !retval {
-					logger.Info("task/retval is nil, ignore")
-					continue
-				}
-
-				if old := GetContainerByCid(task.Container); old != nil {
-					old.Delete()
-				} else {
-					logger.Info("要删的容器已经不在了")
-				}
-			}
+			doAdd(app, host, lt.Add, taskReply.Add)
+			doBuild(app, host, lt.Build, taskReply.Build)
+			doRemove(lt.Remove, taskReply.Remove)
 
 			if NeedToRestartNginx(lgt) {
 				hub.done <- app.Id
@@ -256,6 +213,70 @@ func UpdateContainerStatus(host *Host, statuses []*StatusInfo) {
 			} else {
 				logger.Info("Container ", status.Id, " already removed")
 			}
+		}
+	}
+}
+
+func doAdd(app *Application, host *Host, tasks []*AddTask, replies []string) {
+	for i := 0; i < len(tasks); i = i + 1 {
+		task, retval := tasks[i], replies[i]
+
+		logger.Debug("add tasks[i]: ", task)
+		logger.Debug("add taskReplies[i]: ", retval)
+
+		if task == nil || retval == "" {
+			logger.Info("task/retval is nil, ignore")
+			continue
+		}
+
+		if task.IsTest() {
+			// 暂时先不存这个
+			logger.Info("task tests, ignore")
+			continue
+		}
+
+		NewContainer(app, host, task.Bind, retval, task.Daemon)
+	}
+
+}
+
+func doBuild(app *Application, host *Host, tasks []*BuildTask, replies []string) {
+	for i := 0; i < len(tasks); i = i + 1 {
+		task, retval := tasks[i], replies[i]
+
+		logger.Debug("build tasks[i]: ", task)
+		logger.Debug("build taskReplies[i]: ", retval)
+
+		if task == nil || retval == "" {
+			logger.Info("task/retval is nil, ignore")
+			continue
+		}
+
+		appUserUid := app.UserUid()
+		staticPath := path.Join(config.Nginx.Staticdir, app.Name, app.Version)
+		staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
+		if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
+			logger.Info("copy files error: ", err)
+		}
+	}
+}
+
+func doRemove(tasks []*RemoveTask, replies []bool) {
+	for i := 0; i < len(tasks); i = i + 1 {
+		task, retval := tasks[i], replies[i]
+
+		logger.Debug("remove tasks[i]: ", task)
+		logger.Debug("remove taskReplies[i]: ", retval)
+
+		if task == nil || !retval {
+			logger.Info("task/retval is nil, ignore")
+			continue
+		}
+
+		if old := GetContainerByCid(task.Container); old != nil {
+			old.Delete()
+		} else {
+			logger.Info("要删的容器已经不在了")
 		}
 	}
 }

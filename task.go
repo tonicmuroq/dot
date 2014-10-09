@@ -65,7 +65,6 @@ type GroupedTask struct {
 	Name    string
 	Uid     int
 	Id      string
-	Type    int
 	Version string
 	Tasks   []*Task
 }
@@ -169,6 +168,11 @@ func (self *Task) ToRemoveTask() *RemoveTask {
 		Container: self.Container,
 		RmImage:   false,
 	}
+}
+
+// AddTask
+func (self *AddTask) IsTest() bool {
+	return self.Test != ""
 }
 
 func AddContainerTask(app *Application, host *Host) *Task {
