@@ -130,16 +130,18 @@ func (self *Levi) Run() {
 		case err != nil:
 			logger.Info("read json error: ", err)
 			finish = true
-		case err == nil:
+		default:
 
 			taskUUID := taskReply.Id
 
-			// 如果 taskUUID 是一个特殊命令
-			// 那么根据特殊命令做出回应, 不再执行下面的步骤
-			if taskUUID == "__STATUS__" {
+			if taskUUID == "__STATUS__" || len(taskReply.Status) != 0 {
 				logger.Info("special commands")
 				UpdateContainerStatus(host, taskReply.Status)
 				continue
+			}
+
+			if taskReply.Test != nil {
+				logger.Info("test result ", taskReply.Test)
 			}
 
 			// 普通任务的返回值
@@ -149,24 +151,6 @@ func (self *Levi) Run() {
 				continue
 			}
 
-			// 如果这个任务是获取容器信息, 那么根据返回值来更新容器状态
-			// 由于返回值的数量会比任务数量要多, 因此直接执行
-			// 不再执行下面的步骤
-			if lgt.Info {
-				logger.Info("update container status base on result")
-				UpdateContainerStatus(host, taskReply.Status)
-				// 因为不再往下执行于是需要删除这个记录
-				delete(self.waiting, taskUUID)
-				continue
-			}
-
-			if taskReply.Test != nil {
-				logger.Info("test result ", taskReply.Test)
-			}
-
-			// 普通的任务和返回值数量对等的任务
-			// 包括 AddContainer, RemoveContainer, UpdateContainer,
-			// BuildImage, TestApplication
 			app := GetApplicationByNameAndVersion(lgt.Name, lgt.Version)
 			if app == nil {
 				logger.Info("app 没了")
@@ -178,7 +162,7 @@ func (self *Levi) Run() {
 			doBuild(app, host, lt.Build, taskReply.Build)
 			doRemove(lt.Remove, taskReply.Remove)
 
-			if NeedToRestartNginx(lgt) {
+			if lgt.NeedToRestartNginx() {
 				hub.done <- app.Id
 			}
 
@@ -194,14 +178,9 @@ func (self *Levi) Run() {
 func (self *Levi) Len() int {
 	count := 0
 	for _, value := range self.tasks {
-		count = count + len(value.Tasks)
+		count += len(value.Tasks)
 	}
 	return count
-}
-
-func NeedToRestartNginx(lgt *LeviGroupedTask) bool {
-	lt := lgt.Tasks
-	return len(lt.Build) != 0 || len(lt.Add) != 0 || len(lt.Remove) != 0
 }
 
 func UpdateContainerStatus(host *Host, statuses []*StatusInfo) {
@@ -237,7 +216,6 @@ func doAdd(app *Application, host *Host, tasks []*AddTask, replies []string) {
 
 		NewContainer(app, host, task.Bind, retval, task.Daemon)
 	}
-
 }
 
 func doBuild(app *Application, host *Host, tasks []*BuildTask, replies []string) {

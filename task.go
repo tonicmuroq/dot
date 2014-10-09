@@ -175,6 +175,21 @@ func (self *AddTask) IsTest() bool {
 	return self.Test != ""
 }
 
+// LeviGroupedTask
+// only add/remove needs to retart nginx
+// and test shall be ignored
+func (self *LeviGroupedTask) NeedToRestartNginx() bool {
+	lt := self.Tasks
+	// Test not counted
+	addCount := 0
+	for _, add := range lt.Add {
+		if !add.IsTest() {
+			addCount += 1
+		}
+	}
+	return addCount > 0 || len(lt.Remove) != 0
+}
+
 func AddContainerTask(app *Application, host *Host) *Task {
 
 	appYaml, err := app.GetAppYaml()
