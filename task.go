@@ -23,6 +23,26 @@ type BuildTask struct {
 	Schema  string
 }
 
+type AddTask struct {
+	Name      string
+	Version   string
+	Bind      int
+	Port      int
+	Cmd       []string
+	Memory    int
+	CpuShares int
+	CpuSet    string
+	Daemon    string
+	Test      string
+}
+
+type RemoveTask struct {
+	Name      string
+	Version   string
+	Container string
+	RmImage   bool
+}
+
 type Task struct {
 	Name      string
 	Version   string
@@ -45,14 +65,131 @@ type GroupedTask struct {
 	Name    string
 	Uid     int
 	Id      string
-	Type    int
 	Version string
 	Tasks   []*Task
 }
 
-type TaskReply map[string][]interface{}
+type LeviTasks struct {
+	Build  []*BuildTask
+	Add    []*AddTask
+	Remove []*RemoveTask
+}
+
+type LeviGroupedTask struct {
+	Id      string
+	Uid     int
+	Name    string
+	Version string
+	Info    bool
+	Tasks   *LeviTasks
+}
+
+type TestResult struct {
+	ExitCode int
+	Err      string
+}
+
+type StatusInfo struct {
+	Type    string
+	Appname string
+	Id      string
+}
+
+type TaskReply struct {
+	Id     string
+	Build  []string
+	Add    []string
+	Remove []bool
+	Test   map[string]*TestResult
+	Status []*StatusInfo
+}
+
+func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
+	lgt := &LeviGroupedTask{
+		Id:      self.Id,
+		Uid:     self.Uid,
+		Name:    self.Name,
+		Version: self.Version,
+		Info:    false,
+	}
+	lt := &LeviTasks{}
+	for _, task := range self.Tasks {
+		switch task.Type {
+		case AddContainer, TestApplication:
+			lt.Add = append(lt.Add, task.ToAddTask())
+		case RemoveContainer:
+			lt.Remove = append(lt.Remove, task.ToRemoveTask())
+		case UpdateContainer:
+			lt.Add = append(lt.Add, task.ToAddTask())
+			lt.Remove = append(lt.Remove, task.ToRemoveTask())
+		case BuildImage:
+			lt.Build = append(lt.Build, task.ToBuildTask())
+		case HostInfo:
+			lgt.Info = true
+		}
+	}
+	lgt.Tasks = lt
+	return lgt
+}
 
 // Task
+func (self *Task) ToAddTask() *AddTask {
+	return &AddTask{
+		Name:      self.Name,
+		Version:   self.Version,
+		Bind:      self.Bind,
+		Port:      self.Port,
+		Cmd:       self.Cmd,
+		Memory:    self.Memory,
+		CpuShares: self.CpuShare,
+		CpuSet:    self.CpuSet,
+		Daemon:    self.Daemon,
+		Test:      self.Test,
+	}
+}
+
+func (self *Task) ToBuildTask() *BuildTask {
+	build := self.Build
+	return &BuildTask{
+		Name:    build.Name,
+		Version: build.Version,
+		Group:   build.Group,
+		Base:    build.Base,
+		Build:   build.Build,
+		Static:  build.Static,
+		Schema:  build.Schema,
+	}
+}
+
+func (self *Task) ToRemoveTask() *RemoveTask {
+	return &RemoveTask{
+		Name:      self.Name,
+		Version:   self.Version,
+		Container: self.Container,
+		RmImage:   false,
+	}
+}
+
+// AddTask
+func (self *AddTask) IsTest() bool {
+	return self.Test != ""
+}
+
+// LeviGroupedTask
+// only add/remove needs to retart nginx
+// and test shall be ignored
+func (self *LeviGroupedTask) NeedToRestartNginx() bool {
+	lt := self.Tasks
+	// Test not counted
+	addCount := 0
+	for _, add := range lt.Add {
+		if !add.IsTest() {
+			addCount += 1
+		}
+	}
+	return addCount > 0 || len(lt.Remove) != 0
+}
+
 func AddContainerTask(app *Application, host *Host) *Task {
 
 	appYaml, err := app.GetAppYaml()
