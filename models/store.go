@@ -15,7 +15,7 @@ var portMutex sync.Mutex
 func LoadStore() {
 	// mysql
 	orm.RegisterDataBase(config.Config.Db.Name, config.Config.Db.Use, config.Config.Db.Url, 30)
-	orm.RegisterModel(new(Application), new(User), new(Host), new(Container), new(HostPort))
+	orm.RegisterModel(new(Application), new(User), new(Host), new(Container), new(HostPort), new(StoredTask))
 	orm.RunSyncdb(config.Config.Db.Name, false, false)
 	db = orm.NewOrm()
 

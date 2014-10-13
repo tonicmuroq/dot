@@ -13,9 +13,16 @@ const (
 	BuildImage      = 4
 	TestApplication = 5
 	HostInfo        = 6
+
+	RUNNING = 0
+	DONE    = 1
+
+	SUCC = 0
+	FAIL = 1
 )
 
 type BuildTask struct {
+	Id      int
 	Name    string
 	Version string
 	Group   string
@@ -26,6 +33,7 @@ type BuildTask struct {
 }
 
 type AddTask struct {
+	Id        int
 	Name      string
 	Version   string
 	Bind      int
@@ -39,6 +47,7 @@ type AddTask struct {
 }
 
 type RemoveTask struct {
+	Id        int
 	Name      string
 	Version   string
 	Container string
@@ -46,6 +55,7 @@ type RemoveTask struct {
 }
 
 type Task struct {
+	Id        int
 	Name      string
 	Version   string
 	Port      int
@@ -106,6 +116,15 @@ type TaskReply struct {
 	Status []*StatusInfo
 }
 
+type StoredTask struct {
+	Id     int
+	AppId  int // 对应应用
+	Status int // 对应状态, Running/Done
+	Succ   int // 成功/失败
+	Kind   int // 类型, Add/Remove/Update/Build/Test
+	Result string
+}
+
 func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
 	lgt := &LeviGroupedTask{
 		Id:      self.Id,
@@ -134,9 +153,58 @@ func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
 	return lgt
 }
 
+// StoredTask
+func (self *StoredTask) TableIndex() [][]string {
+	return [][]string{
+		[]string{"AppId"},
+		[]string{"Status"},
+		[]string{"Kind"},
+	}
+}
+
+func GetStoredTaskById(id int) *StoredTask {
+	var st StoredTask
+	if err := db.QueryTable(new(StoredTask)).Filter("Id", id).One(&st); err != nil {
+		return nil
+	} else {
+		return &st
+	}
+}
+
+func NewStoredTask(appId, kind int) *StoredTask {
+	st := StoredTask{AppId: appId, Status: RUNNING, Succ: FAIL, Kind: kind}
+	if _, err := db.Insert(&st); err == nil {
+		return &st
+	} else {
+		return nil
+	}
+}
+
+func GetStoredTaskByAppAndRet(appId int, ret string) *StoredTask {
+	var st StoredTask
+	if err := db.QueryTable(new(StoredTask)).Filter("AppId", appId).Filter("Result", ret).One(&st); err != nil {
+		return nil
+	} else {
+		return &st
+	}
+}
+
+func (self *StoredTask) Done(succ int, result string) {
+	self.Status = DONE
+	self.Succ = succ
+	self.Result = result
+	db.Update(self)
+}
+
+func (self *StoredTask) SetResult(result string) {
+	self.Result = result
+	db.Update(self)
+}
+
 // Task
 func (self *Task) ToAddTask() *AddTask {
 	return &AddTask{
+		Id:        self.Id,
 		Name:      self.Name,
 		Version:   self.Version,
 		Bind:      self.Bind,
@@ -151,20 +219,12 @@ func (self *Task) ToAddTask() *AddTask {
 }
 
 func (self *Task) ToBuildTask() *BuildTask {
-	build := self.Build
-	return &BuildTask{
-		Name:    build.Name,
-		Version: build.Version,
-		Group:   build.Group,
-		Base:    build.Base,
-		Build:   build.Build,
-		Static:  build.Static,
-		Schema:  build.Schema,
-	}
+	return &self.Build
 }
 
 func (self *Task) ToRemoveTask() *RemoveTask {
 	return &RemoveTask{
+		Id:        self.Id,
 		Name:      self.Name,
 		Version:   self.Version,
 		Container: self.Container,
@@ -219,7 +279,14 @@ func AddContainerTask(app *Application, host *Host) *Task {
 	cmd := strings.Split(cmdString, " ")
 	port := appYaml.Port
 
+	st := NewStoredTask(app.Id, AddContainer)
+	if st == nil {
+		Logger.Info("task not inserted")
+		return nil
+	}
+
 	task := Task{
+		Id:       st.Id,
 		Name:     strings.ToLower(app.Name),
 		Version:  app.Version,
 		Port:     port,
@@ -241,7 +308,15 @@ func RemoveContainerTask(container *Container) *Task {
 	if app == nil || host == nil {
 		return nil
 	}
+
+	st := NewStoredTask(app.Id, RemoveContainer)
+	if st == nil {
+		Logger.Info("task not inserted")
+		return nil
+	}
+
 	task := Task{
+		Id:        st.Id,
 		Name:      strings.ToLower(app.Name),
 		Version:   app.Version,
 		Host:      host.IP,
@@ -279,7 +354,14 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 	cmd := strings.Split(cmdString, " ")
 	port := appYaml.Port
 
+	st := NewStoredTask(app.Id, UpdateContainer)
+	if st == nil {
+		Logger.Info("task not inserted")
+		return nil
+	}
+
 	task := Task{
+		Id:        st.Id,
 		Name:      strings.ToLower(app.Name),
 		Version:   app.Version,
 		Port:      port,
@@ -313,7 +395,13 @@ func BuildImageTask(app *Application, group, base string) *Task {
 		Logger.Debug("build task error: need build in app.yaml")
 		return nil
 	}
+	st := NewStoredTask(app.Id, BuildImage)
+	if st == nil {
+		Logger.Info("task not inserted")
+		return nil
+	}
 	buildTask := BuildTask{
+		Id:      st.Id,
 		Name:    app.Pname,
 		Version: app.Version,
 		Group:   group,
@@ -323,6 +411,7 @@ func BuildImageTask(app *Application, group, base string) *Task {
 		Schema:  "", // 先来个空的吧
 	}
 	task := Task{
+		Id:      st.Id,
 		Name:    strings.ToLower(app.Name),
 		Uid:     app.UserUid(),
 		Type:    BuildImage,
@@ -350,7 +439,13 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 	testCmd := strings.Split(testCmdString, " ")
 	port := appYaml.Port
 
+	st := NewStoredTask(app.Id, TestApplication)
+	if st == nil {
+		Logger.Info("task not inserted")
+		return nil
+	}
 	task := Task{
+		Id:       st.Id,
 		Name:     strings.ToLower(app.Name),
 		Version:  app.Version,
 		Port:     port,
