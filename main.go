@@ -1,6 +1,9 @@
 package main
 
 import (
+	"./config"
+	"./models"
+	. "./utils"
 	"net/http"
 	"os"
 	"os/signal"
@@ -8,15 +11,18 @@ import (
 )
 
 func main() {
+	config.LoadConfig()
+	models.LoadStore()
+
 	go hub.CheckAlive()
 	go hub.Run()
 
 	http.Handle("/", restServer)
 	http.HandleFunc("/ws", ServeWs)
 
-	err := http.ListenAndServe(config.Bind, nil)
+	err := http.ListenAndServe(config.Config.Bind, nil)
 	if err != nil {
-		logger.Assert(err, "http")
+		Logger.Assert(err, "http")
 	}
 
 	go func() {
@@ -24,7 +30,7 @@ func main() {
 		signal.Notify(sc, os.Interrupt)
 		signal.Notify(sc, syscall.SIGTERM)
 		signal.Notify(sc, syscall.SIGHUP)
-		logger.Info("Got <-", <-sc)
+		Logger.Info("Got <-", <-sc)
 		hub.Close()
 		os.Exit(0)
 	}()

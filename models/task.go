@@ -1,6 +1,8 @@
-package main
+package models
 
 import (
+	"../config"
+	. "../utils"
 	"strings"
 )
 
@@ -194,7 +196,7 @@ func AddContainerTask(app *Application, host *Host) *Task {
 
 	appYaml, err := app.GetAppYaml()
 	if err != nil {
-		logger.Debug("app.yaml error: ", err)
+		Logger.Debug("app.yaml error: ", err)
 		return nil
 	}
 
@@ -226,9 +228,9 @@ func AddContainerTask(app *Application, host *Host) *Task {
 		Type:     AddContainer,
 		Uid:      app.UserUid(),
 		Bind:     bind,
-		Memory:   config.Task.Memory,
-		CpuShare: config.Task.CpuShare,
-		CpuSet:   config.Task.CpuSet,
+		Memory:   config.Config.Task.Memory,
+		CpuShare: config.Config.Task.CpuShare,
+		CpuSet:   config.Config.Task.CpuSet,
 		Daemon:   daemonId}
 	return &task
 }
@@ -286,9 +288,9 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		Type:      UpdateContainer,
 		Uid:       app.UserUid(),
 		Bind:      bind,
-		Memory:    config.Task.Memory,
-		CpuShare:  config.Task.CpuShare,
-		CpuSet:    config.Task.CpuSet,
+		Memory:    config.Config.Task.Memory,
+		CpuShare:  config.Config.Task.CpuShare,
+		CpuSet:    config.Config.Task.CpuSet,
 		Daemon:    daemonId,
 		Container: container.ContainerId}
 	return &task
@@ -304,11 +306,11 @@ func BuildImageTask(app *Application, group, base string) *Task {
 	}
 	appYaml, err := app.GetAppYaml()
 	if err != nil {
-		logger.Debug("app.yaml error: ", err)
+		Logger.Debug("app.yaml error: ", err)
 		return nil
 	}
 	if len(appYaml.Build) == 0 {
-		logger.Debug("build task error: need build in app.yaml")
+		Logger.Debug("build task error: need build in app.yaml")
 		return nil
 	}
 	buildTask := BuildTask{
@@ -337,11 +339,11 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 
 	appYaml, err := app.GetAppYaml()
 	if err != nil {
-		logger.Debug("app.yaml error: ", err)
+		Logger.Debug("app.yaml error: ", err)
 		return nil
 	}
 	if len(appYaml.Test) == 0 {
-		logger.Debug("test task error: need test in app.yaml")
+		Logger.Debug("test task error: need test in app.yaml")
 		return nil
 	}
 	testCmdString := appYaml.Test[0]
@@ -357,9 +359,9 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 		Type:     TestApplication,
 		Uid:      app.UserUid(),
 		Bind:     bind,
-		Memory:   config.Task.Memory,
-		CpuShare: config.Task.CpuShare,
-		CpuSet:   config.Task.CpuSet,
+		Memory:   config.Config.Task.Memory,
+		CpuShare: config.Config.Task.CpuShare,
+		CpuSet:   config.Config.Task.CpuSet,
 		Test:     testId}
 	return &task
 }

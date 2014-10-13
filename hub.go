@@ -1,6 +1,9 @@
 package main
 
 import (
+	"./config"
+	"./models"
+	. "./utils"
 	"errors"
 	"fmt"
 	"net/http"
@@ -54,7 +57,7 @@ func (self *Hub) CheckAlive() {
 			duration := time.Since(last)
 			// 如果一个连接不再存在, 那么删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
-				logger.Info(host, " is disconnected.")
+				Logger.Info(host, " is disconnected.")
 				self.RemoveLevi(host)
 			}
 		}
@@ -71,23 +74,23 @@ func (self *Hub) Run() {
 		case appId := <-self.done:
 			self.appIds = append(self.appIds, appId)
 			if len(self.appIds) >= self.size {
-				logger.Info("restart nginx on full")
+				Logger.Info("restart nginx on full")
 				self.RestartNginx()
 			}
 		case <-self.closed:
 			if len(self.appIds) != 0 {
-				logger.Info("restart nginx on close")
+				Logger.Info("restart nginx on close")
 				self.RestartNginx()
 			}
 			self.finished = true
-		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
+		case <-time.After(time.Second * time.Duration(config.Config.Task.Dispatch)):
 			if len(self.appIds) != 0 {
-				logger.Info("restart nginx on schedule")
+				Logger.Info("restart nginx on schedule")
 				self.RestartNginx()
 			}
 		case <-self.immediate:
 			if len(self.appIds) != 0 {
-				logger.Info("restart nginx immediately")
+				Logger.Info("restart nginx immediately")
 				self.RestartNginx()
 			}
 		}
@@ -96,16 +99,16 @@ func (self *Hub) Run() {
 
 func (self *Hub) RestartNginx() {
 	for _, appId := range self.appIds {
-		if app := GetApplicationById(appId); app != nil {
+		if app := models.GetApplicationById(appId); app != nil {
 
-			conf := path.Join(config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
+			conf := path.Join(config.Config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
 			var data = struct {
 				Name  string
 				Path  string
 				Hosts []string
 			}{
 				Name:  app.Name,
-				Path:  path.Join(config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", app.Name, app.Version)),
+				Path:  path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", app.Name, app.Version)),
 				Hosts: []string{},
 			}
 
@@ -117,16 +120,16 @@ func (self *Hub) RestartNginx() {
 				f, err := os.Create(conf)
 				defer f.Close()
 				if err != nil {
-					logger.Info("Create nginx conf failed", err)
+					Logger.Info("Create nginx conf failed", err)
 					continue
 				}
 				for _, host := range hosts {
-					hostStr := fmt.Sprintf("%s:%v", host.IP, config.Nginx.Port)
+					hostStr := fmt.Sprintf("%s:%v", host.IP, config.Config.Nginx.Port)
 					data.Hosts = append(data.Hosts, hostStr)
 				}
-				tmpl := template.Must(template.ParseFiles(config.Nginx.Template))
+				tmpl := template.Must(template.ParseFiles(config.Config.Nginx.Template))
 				if err := tmpl.Execute(f, data); err != nil {
-					logger.Info("Render nginx conf failed", err)
+					Logger.Info("Render nginx conf failed", err)
 				}
 			}
 
@@ -135,7 +138,7 @@ func (self *Hub) RestartNginx() {
 	}
 	cmd := exec.Command("nginx", "-s", "reload")
 	if err := cmd.Run(); err != nil {
-		logger.Info("Restart nginx failed", err)
+		Logger.Info("Restart nginx failed", err)
 	}
 	self.appIds = []int{}
 }
@@ -162,7 +165,7 @@ func (self *Hub) Close() {
 	self.closed <- true
 }
 
-func (self *Hub) Dispatch(host string, task *Task) error {
+func (self *Hub) Dispatch(host string, task *models.Task) error {
 	levi, ok := self.levis[host]
 	if !ok || levi == nil {
 		return errors.New(fmt.Sprintf("%s levi not exists", host))
@@ -233,21 +236,21 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Info(err)
+		Logger.Info(err)
 		return
 	}
 
 	// 创建个新连接, 新建一条host记录
 	// 同时开始 listen
 	c := NewConnection(ws, ip, port)
-	levi := NewLevi(c, config.Task.Queuesize)
+	levi := NewLevi(c, config.Config.Task.Queuesize)
 	hub.AddLevi(levi)
-	NewHost(ip, "")
+	models.NewHost(ip, "")
 
 	go levi.Run()
 	go levi.WaitTask()
 
-	task := HostInfoTask(levi.Host())
+	task := models.HostInfoTask(levi.Host())
 	hub.Dispatch(ip, task)
 	levi.immediate <- true
 }
