@@ -234,16 +234,25 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 			continue
 		}
 		// 其他的add任务来看是不是成功
-		if st := models.GetStoredTaskById(task.Id); st != nil && !task.IsTest() {
-			if retval != "" {
-				st.Done(models.SUCC, retval)
+		if st := models.GetStoredTaskById(task.Id); st != nil {
+			if !task.IsTest() {
+				if retval != "" {
+					st.Done(models.SUCC, retval)
+				} else {
+					st.Done(models.FAIL, retval)
+				}
 			} else {
-				st.Done(models.FAIL, retval)
+				st.SetResult(retval)
 			}
 		}
 
+		identId := task.Daemon
+		if task.IsTest() {
+			identId = task.Test
+		}
+
 		if retval != "" {
-			models.NewContainer(app, host, task.Bind, retval, task.Daemon)
+			models.NewContainer(app, host, task.Bind, retval, identId)
 		}
 	}
 }
