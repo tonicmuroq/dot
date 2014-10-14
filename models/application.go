@@ -81,6 +81,12 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 
 	// 生成新用户
 	appName := appYamlJson.Appname
+
+	if app := GetApplicationByNameAndVersion(appName, Version); app != nil {
+		// 已经有就不注册了
+		return app
+	}
+
 	user := User{Name: appName}
 	if _, id, err := db.ReadOrCreate(&user, "Name"); err == nil {
 		user.Id = int(id)
