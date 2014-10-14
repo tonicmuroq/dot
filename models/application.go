@@ -50,8 +50,7 @@ func (self *Application) TableUnique() [][]string {
 
 func GetApplicationById(appId int) *Application {
 	var app Application
-	err := db.QueryTable(new(Application)).Filter("Id", appId).One(&app)
-	if err != nil {
+	if err := db.QueryTable(new(Application)).Filter("Id", appId).One(&app); err != nil {
 		return nil
 	}
 	return &app
@@ -155,8 +154,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 
 func GetApplicationByNameAndVersion(name, version string) *Application {
 	var app Application
-	err := db.QueryTable(new(Application)).Filter("Name", name).Filter("Version", version).RelatedSel().One(&app)
-	if err != nil {
+	if err := db.QueryTable(new(Application)).Filter("Name", name).Filter("Version", version).RelatedSel().One(&app); err != nil {
 		return nil
 	}
 	return &app
@@ -185,17 +183,16 @@ func (self *Application) GetOrCreateDbInfo(kind string, createFunction func(*App
 func (self *Application) CreateDNS() error {
 	dns := make(map[string]string)
 	dns["host"] = config.Config.Masteraddr
-	cpath := fmt.Sprintf("/skydns/com/hunantv/intra/%s", self.Name)
-	_, err := etcdClient.Create(cpath, "", 0)
-	if err != nil {
+	cpath := path.Join("/skydns/com/hunantv/intra", self.Name)
+	if _, err := etcdClient.Create(cpath, "", 0); err != nil {
 		return err
 	}
 	if r, err := JSONEncode(dns); err == nil {
 		etcdClient.Set(cpath, r, 0)
+		return nil
 	} else {
 		return err
 	}
-	return nil
 }
 
 func (self *Application) GetYamlPath(cpath string) string {
@@ -255,22 +252,18 @@ func (self *Application) Hosts() []*Host {
 }
 
 func CreateMySQL(app *Application) (map[string]interface{}, error) {
-	// TODO 接入数据库
-	// businessCode := app.Name
-	// dbName := app.Name
-	// dbUid := app.Name
-	// dbPwd := "123"
-	t := time.Now().String()
-	code := CreateSha1HexValue([]byte(app.Name + app.Version + t))
 
-	v := url.Values{}
-	v.Set("SysUid", config.Config.Dba.Sysuid)
-	v.Set("SysPwd", config.Config.Dba.Syspwd)
-	v.Set("businessCode", config.Config.Dba.Bcode)
-	v.Set("DbName", app.Name)
-	v.Set("DbUid", app.Name)
-	v.Set("DbPwd", code[:8])
-	if r, err := http.DefaultClient.PostForm(config.Config.Dba.Addr, v); err == nil {
+	password := CreateSha1HexValue([]byte(app.Name + app.Version + time.Now().String()))
+
+	form := url.Values{}
+	form.Set("SysUid", config.Config.Dba.Sysuid)
+	form.Set("SysPwd", config.Config.Dba.Syspwd)
+	form.Set("businessCode", config.Config.Dba.Bcode)
+	form.Set("DbName", app.Name)
+	form.Set("DbUid", app.Name)
+	form.Set("DbPwd", password[:8])
+
+	if r, err := http.DefaultClient.PostForm(config.Config.Dba.Addr, form); err == nil {
 		defer r.Body.Close()
 		result, _ := ioutil.ReadAll(r.Body)
 		var d map[string]string
