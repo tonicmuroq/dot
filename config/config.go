@@ -1,6 +1,7 @@
-package main
+package config
 
 import (
+	. "../utils"
 	"flag"
 	"io/ioutil"
 	"os"
@@ -56,28 +57,24 @@ type DotConfig struct {
 	Dba   DbaConfig
 }
 
-var config = DotConfig{}
+var Config = DotConfig{}
 
 func LoadConfig() {
 	var configPath string
-	flag.BoolVar(&logger.Mode, "DEBUG", false, "enable debug")
+	flag.BoolVar(&Logger.Mode, "DEBUG", false, "enable debug")
 	flag.StringVar(&configPath, "c", "dot.yaml", "config file")
 	flag.Parse()
 
 	if _, err := os.Stat(configPath); err != nil {
-		logger.Assert(err, "config file invaild")
+		Logger.Assert(err, "config file invaild")
 	}
 
 	b, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		logger.Assert(err, "Read config file failed")
+		Logger.Assert(err, "Read config file failed")
 	}
 
-	if err := yaml.Unmarshal(b, &config); err != nil {
-		logger.Assert(err, "Load config file failed")
+	if err := yaml.Unmarshal(b, &Config); err != nil {
+		Logger.Assert(err, "Load config file failed")
 	}
-}
-
-func init() {
-	LoadConfig()
 }

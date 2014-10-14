@@ -1,6 +1,9 @@
 package main
 
 import (
+	"./config"
+	"./models"
+	. "./utils"
 	"fmt"
 	"path"
 	"sync"
@@ -11,32 +14,32 @@ import (
 
 type Levi struct {
 	conn      *Connection
-	inTask    chan *Task
+	inTask    chan *models.Task
 	closed    chan bool
 	immediate chan bool
 	host      string
 	size      int
-	tasks     map[string]*GroupedTask
-	waiting   map[string]*LeviGroupedTask
+	tasks     map[string]*models.GroupedTask
+	waiting   map[string]*models.LeviGroupedTask
 	wg        *sync.WaitGroup
 }
 
 func NewLevi(conn *Connection, size int) *Levi {
 	return &Levi{
 		conn:      conn,
-		inTask:    make(chan *Task),
+		inTask:    make(chan *models.Task),
 		closed:    make(chan bool),
 		immediate: make(chan bool),
 		host:      conn.host,
 		size:      size,
-		tasks:     make(map[string]*GroupedTask),
-		waiting:   make(map[string]*LeviGroupedTask),
+		tasks:     make(map[string]*models.GroupedTask),
+		waiting:   make(map[string]*models.LeviGroupedTask),
 		wg:        &sync.WaitGroup{},
 	}
 }
 
-func (self *Levi) Host() *Host {
-	return GetHostByIP(self.host)
+func (self *Levi) Host() *models.Host {
+	return models.GetHostByIP(self.host)
 }
 
 func (self *Levi) WaitTask() {
@@ -45,7 +48,7 @@ func (self *Levi) WaitTask() {
 	for !finish {
 		select {
 		case task, ok := <-self.inTask:
-			logger.Debug("levi got task ", task, ok)
+			Logger.Debug("levi got task ", task, ok)
 			if task == nil {
 				// 有nil, 无视掉
 				break
@@ -56,33 +59,33 @@ func (self *Levi) WaitTask() {
 			}
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Version)
 			if _, exists := self.tasks[key]; !exists {
-				self.tasks[key] = &GroupedTask{
+				self.tasks[key] = &models.GroupedTask{
 					Name:    task.Name,
 					Uid:     task.Uid,
 					Id:      uuid.New(),
 					Version: task.Version,
-					Tasks:   []*Task{},
+					Tasks:   []*models.Task{},
 				}
 			}
 			self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
 			if self.Len() >= self.size {
-				logger.Debug("send tasks when full")
+				Logger.Debug("send tasks when full")
 				self.SendTasks()
 			}
 		case <-self.closed:
 			if self.Len() != 0 {
-				logger.Debug("send tasks before close")
+				Logger.Debug("send tasks before close")
 				self.SendTasks()
 			}
 			finish = true
 		case <-self.immediate:
 			if self.Len() > 0 {
-				logger.Debug("send tasks immediate")
+				Logger.Debug("send tasks immediate")
 				self.SendTasks()
 			}
-		case <-time.After(time.Second * time.Duration(config.Task.Dispatch)):
+		case <-time.After(time.Second * time.Duration(config.Config.Task.Dispatch)):
 			if self.Len() != 0 {
-				logger.Debug("send tasks when timeout")
+				Logger.Debug("send tasks when timeout")
 				self.SendTasks()
 			}
 		}
@@ -103,17 +106,17 @@ func (self *Levi) Close() {
 func (self *Levi) SendTasks() {
 	self.wg.Add(len(self.tasks))
 	for _, groupedTask := range self.tasks {
-		go func(groupedTask *GroupedTask) {
+		go func(groupedTask *models.GroupedTask) {
 			defer self.wg.Done()
 			leviGroupedTask := groupedTask.ToLeviGroupedTask()
 			self.waiting[groupedTask.Id] = leviGroupedTask
 			if err := self.conn.ws.WriteJSON(&leviGroupedTask); err != nil {
-				logger.Info(err, "JSON write error")
+				Logger.Info(err, "JSON write error")
 			}
 		}(groupedTask)
 	}
 	self.wg.Wait()
-	self.tasks = make(map[string]*GroupedTask)
+	self.tasks = make(map[string]*models.GroupedTask)
 }
 
 func (self *Levi) Run() {
@@ -125,35 +128,58 @@ func (self *Levi) Run() {
 	}()
 	host := self.Host()
 	for !finish {
-		var taskReply TaskReply
+		var taskReply models.TaskReply
 		switch err := self.conn.ws.ReadJSON(&taskReply); {
 		case err != nil:
-			logger.Info("read json error: ", err)
+			Logger.Info("read json error: ", err)
 			finish = true
 		default:
 
 			taskUUID := taskReply.Id
 
 			if taskUUID == "__STATUS__" || len(taskReply.Status) != 0 {
-				logger.Info("special commands")
+				Logger.Info("special commands")
 				UpdateContainerStatus(host, taskReply.Status)
 				continue
 			}
 
 			if taskReply.Test != nil {
-				logger.Info("test result ", taskReply.Test)
+				// 根据保存的container以及关联的任务
+				// 处理测试任务结果
+				Logger.Info("Test result")
+				for containerId, testResult := range taskReply.Test {
+					Logger.Debug("test result ", testResult)
+					Logger.Debug("test container id ", containerId)
+					container := models.GetContainerByCid(containerId)
+					Logger.Debug("test container ", container)
+					if container == nil {
+						continue
+					}
+					st := models.GetStoredTaskByAppAndRet(container.AppId, container.ContainerId)
+					Logger.Debug("test stored task ", st)
+					if st == nil {
+						continue
+					}
+					if testResult.ExitCode == 0 {
+						st.Done(models.SUCC, testResult.Err)
+					} else {
+						st.Done(models.FAIL, testResult.Err)
+					}
+					container.Delete()
+				}
+				continue
 			}
 
 			// 普通任务的返回值
 			lgt, exists := self.waiting[taskUUID]
 			if !exists {
-				logger.Info("not exists, ignore")
+				Logger.Info("not exists, ignore")
 				continue
 			}
 
-			app := GetApplicationByNameAndVersion(lgt.Name, lgt.Version)
+			app := models.GetApplicationByNameAndVersion(lgt.Name, lgt.Version)
 			if app == nil {
-				logger.Info("app 没了")
+				Logger.Info("app 没了")
 				continue
 			}
 
@@ -166,7 +192,7 @@ func (self *Levi) Run() {
 				hub.done <- app.Id
 			}
 
-			if len(GetContainerByHostAndApp(host, app)) == 0 {
+			if len(models.GetContainerByHostAndApp(host, app)) == 0 {
 				hub.immediate <- true
 			}
 
@@ -183,78 +209,107 @@ func (self *Levi) Len() int {
 	return count
 }
 
-func UpdateContainerStatus(host *Host, statuses []*StatusInfo) {
+func UpdateContainerStatus(host *models.Host, statuses []*models.StatusInfo) {
 	for _, status := range statuses {
 		if status.Type == "die" {
-			logger.Info("Should delete ", status.Id, " of ", status.Appname)
-			if c := GetContainerByCid(status.Id); c != nil {
-				hub.Dispatch(host.IP, RemoveContainerTask(c))
+			Logger.Info("Should delete ", status.Id, " of ", status.Appname)
+			if c := models.GetContainerByCid(status.Id); c != nil {
+				hub.Dispatch(host.IP, models.RemoveContainerTask(c))
 			} else {
-				logger.Info("Container ", status.Id, " already removed")
+				Logger.Info("Container ", status.Id, " already removed")
 			}
 		}
 	}
 }
 
-func doAdd(app *Application, host *Host, tasks []*AddTask, replies []string) {
+func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, replies []string) {
 	for i := 0; i < len(tasks); i = i + 1 {
 		task, retval := tasks[i], replies[i]
 
-		logger.Debug("add tasks[i]: ", task)
-		logger.Debug("add taskReplies[i]: ", retval)
+		Logger.Debug("add tasks[i]: ", task)
+		Logger.Debug("add taskReplies[i]: ", retval)
 
-		if task == nil || retval == "" {
-			logger.Info("task/retval is nil, ignore")
+		if task == nil {
+			Logger.Info("task/retval is nil, ignore")
 			continue
 		}
+		// 其他的add任务来看是不是成功
+		if st := models.GetStoredTaskById(task.Id); st != nil {
+			if !task.IsTest() {
+				if retval != "" {
+					st.Done(models.SUCC, retval)
+				} else {
+					st.Done(models.FAIL, retval)
+				}
+			} else {
+				st.SetResult(retval)
+			}
+		}
 
+		identId := task.Daemon
 		if task.IsTest() {
-			// 暂时先不存这个
-			logger.Info("task tests, ignore")
-			continue
+			identId = task.Test
 		}
 
-		NewContainer(app, host, task.Bind, retval, task.Daemon)
+		if retval != "" {
+			models.NewContainer(app, host, task.Bind, retval, identId)
+		}
 	}
 }
 
-func doBuild(app *Application, host *Host, tasks []*BuildTask, replies []string) {
+func doBuild(app *models.Application, host *models.Host, tasks []*models.BuildTask, replies []string) {
 	for i := 0; i < len(tasks); i = i + 1 {
 		task, retval := tasks[i], replies[i]
 
-		logger.Debug("build tasks[i]: ", task)
-		logger.Debug("build taskReplies[i]: ", retval)
+		Logger.Debug("build tasks[i]: ", task)
+		Logger.Debug("build taskReplies[i]: ", retval)
 
-		if task == nil || retval == "" {
-			logger.Info("task/retval is nil, ignore")
+		if task == nil {
+			Logger.Info("task/retval is nil, ignore")
 			continue
 		}
 
 		appUserUid := app.UserUid()
-		staticPath := path.Join(config.Nginx.Staticdir, app.Name, app.Version)
-		staticSrcPath := path.Join(config.Nginx.Staticsrcdir, app.Name, app.Version)
+		staticPath := path.Join(config.Config.Nginx.Staticdir, app.Name, app.Version)
+		staticSrcPath := path.Join(config.Config.Nginx.Staticsrcdir, app.Name, app.Version)
 		if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
-			logger.Info("copy files error: ", err)
+			Logger.Info("copy files error: ", err)
+		}
+		// build 根据返回值来判断是不是成功
+		if st := models.GetStoredTaskById(task.Id); st != nil {
+			if retval != "" {
+				st.Done(models.SUCC, retval)
+			} else {
+				st.Done(models.FAIL, retval)
+			}
 		}
 	}
 }
 
-func doRemove(tasks []*RemoveTask, replies []bool) {
+func doRemove(tasks []*models.RemoveTask, replies []bool) {
 	for i := 0; i < len(tasks); i = i + 1 {
 		task, retval := tasks[i], replies[i]
 
-		logger.Debug("remove tasks[i]: ", task)
-		logger.Debug("remove taskReplies[i]: ", retval)
+		Logger.Debug("remove tasks[i]: ", task)
+		Logger.Debug("remove taskReplies[i]: ", retval)
 
-		if task == nil || !retval {
-			logger.Info("task/retval is nil, ignore")
+		if task == nil {
+			Logger.Info("task/retval is nil, ignore")
 			continue
 		}
 
-		if old := GetContainerByCid(task.Container); old != nil {
+		if old := models.GetContainerByCid(task.Container); old != nil {
 			old.Delete()
 		} else {
-			logger.Info("要删的容器已经不在了")
+			Logger.Info("要删的容器已经不在了")
+		}
+		// build 根据返回值来判断是不是成功
+		if st := models.GetStoredTaskById(task.Id); st != nil {
+			if retval {
+				st.Done(models.SUCC, "removed")
+			} else {
+				st.Done(models.FAIL, "not removed")
+			}
 		}
 	}
 }

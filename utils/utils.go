@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"crypto/sha1"
@@ -6,13 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -49,50 +45,6 @@ func EnsureFileAbsent(path string) error {
 	return os.Remove(path)
 }
 
-func CreateMySQL(app *Application) (map[string]interface{}, error) {
-	// TODO 接入数据库
-	// businessCode := app.Name
-	// dbName := app.Name
-	// dbUid := app.Name
-	// dbPwd := "123"
-	t := time.Now().String()
-	code := CreateSha1HexValue([]byte(app.Name + app.Version + t))
-
-	v := url.Values{}
-	v.Set("SysUid", config.Dba.Sysuid)
-	v.Set("SysPwd", config.Dba.Syspwd)
-	v.Set("businessCode", config.Dba.Bcode)
-	v.Set("DbName", app.Name)
-	v.Set("DbUid", app.Name)
-	v.Set("DbPwd", code[:8])
-	if r, err := http.DefaultClient.PostForm(config.Dba.Addr, v); err == nil {
-		defer r.Body.Close()
-		result, _ := ioutil.ReadAll(r.Body)
-		var d map[string]string
-		json.Unmarshal(result, &d)
-		if d["Result"] == "0" {
-			return nil, errors.New("create mysql failed")
-		}
-		ret := make(map[string]interface{})
-		ret["username"] = d["DbUser"]
-		ret["password"] = d["DbPwd"]
-		ret["host"] = d["IPAddress"]
-		ret["port"], _ = strconv.Atoi(d["Port"])
-		ret["db"] = d["DbName"]
-		return ret, nil
-	} else {
-		return nil, err
-	}
-}
-
-func CreateRedis(app *Application) (map[string]interface{}, error) {
-	// TODO 接入redis
-	r := make(map[string]interface{})
-	r["host"] = "10.1.201.88"
-	r["port"] = time.Now().Nanosecond()%13 + 2000
-	return r, nil
-}
-
 func CreateSha1HexValue(data []byte) string {
 	r := sha1.Sum(data)
 	x := make([]byte, len(r))
@@ -113,8 +65,6 @@ func CreateRandomHexString(salt string, length int) string {
 // dst不能是src的子目录, 也就是dst不能有src的前缀
 // 同时设置所有权限
 func CopyFiles(dst, src string, uid, gid int) error {
-	logger.Debug("static src: ", src)
-	logger.Debug("static dst: ", dst)
 	if _, err := os.Stat(src); err != nil {
 		return err
 	}

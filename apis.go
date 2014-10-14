@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./models"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,7 +26,7 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	configyaml := req.Form.Get("configyaml")
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	if app := NewApplication(projectname, version, appyaml, configyaml); app == nil {
+	if app := models.NewApplication(projectname, version, appyaml, configyaml); app == nil {
 		r["r"] = 1
 		r["msg"] = "error"
 	}
@@ -39,8 +40,8 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
 
-	app := GetApplicationByNameAndVersion(name, version)
-	host := GetHostByIP(ip)
+	app := models.GetApplicationByNameAndVersion(name, version)
+	host := models.GetHostByIP(ip)
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
 	if app == nil || host == nil {
@@ -50,7 +51,7 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "app port is 0 or no daemon"
 	} else {
-		task := AddContainerTask(app, host)
+		task := models.AddContainerTask(app, host)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
@@ -68,15 +69,15 @@ func BuildImageHandler(w http.ResponseWriter, req *http.Request) {
 	ip := req.Form.Get("host")
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	app := GetApplicationByNameAndVersion(name, version)
-	host := GetHostByIP(ip)
+	app := models.GetApplicationByNameAndVersion(name, version)
+	host := models.GetHostByIP(ip)
 	if app == nil || host == nil {
 		r["r"] = 1
 		r["msg"] = "no such app"
 	} else {
 		group := req.Form.Get("group")
 		base := req.Form.Get("base")
-		task := BuildImageTask(app, group, base)
+		task := models.BuildImageTask(app, group, base)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
@@ -94,13 +95,13 @@ func TestImageHandler(w http.ResponseWriter, req *http.Request) {
 	ip := req.Form.Get("host")
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	app := GetApplicationByNameAndVersion(name, version)
-	host := GetHostByIP(ip)
+	app := models.GetApplicationByNameAndVersion(name, version)
+	host := models.GetHostByIP(ip)
 	if app == nil || host == nil {
 		r["r"] = 1
 		r["msg"] = "no such app"
 	} else {
-		task := TestApplicationTask(app, host)
+		task := models.TestApplicationTask(app, host)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
@@ -117,8 +118,8 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	ips := req.Form["hosts"]
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	app := GetApplicationByNameAndVersion(name, version)
-	hosts := GetHostsByIPs(ips)
+	app := models.GetApplicationByNameAndVersion(name, version)
+	hosts := models.GetHostsByIPs(ips)
 	if app == nil {
 		r["r"] = 1
 		r["msg"] = "no such app"
@@ -142,8 +143,8 @@ func RemoveApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	ip := req.Form.Get("host")
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	app := GetApplicationByNameAndVersion(name, version)
-	host := GetHostByIP(ip)
+	app := models.GetApplicationByNameAndVersion(name, version)
+	host := models.GetHostByIP(ip)
 	if app == nil || host == nil {
 		r["r"] = 1
 		r["msg"] = "no such app"
@@ -168,9 +169,9 @@ func UpdateApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	toVersion := req.Form.Get("to")
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	fromApp := GetApplicationByNameAndVersion(name, fromVersion)
-	toApp := GetApplicationByNameAndVersion(name, toVersion)
-	hosts := GetHostsByIPs(ips)
+	fromApp := models.GetApplicationByNameAndVersion(name, fromVersion)
+	toApp := models.GetApplicationByNameAndVersion(name, toVersion)
+	hosts := models.GetHostsByIPs(ips)
 	if fromApp == nil || toApp == nil {
 		r["r"] = 1
 		r["msg"] = fmt.Sprintf("no such app %s, %s", fromApp, toApp)

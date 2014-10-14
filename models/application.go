@@ -1,49 +1,23 @@
-package main
+package models
 
 import (
+	"../config"
+	. "../utils"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
-	"sync"
-
 	"github.com/astaxie/beego/orm"
-	"github.com/coreos/go-etcd/etcd"
-	_ "github.com/go-sql-driver/mysql"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"time"
 )
 
 const (
 	appPathPrefix = "/NBE/"
 )
-
-var db orm.Ormer
-var etcdClient *etcd.Client
-var portMutex sync.Mutex
-
-type Host struct {
-	Id   int
-	IP   string `orm:"column(ip)"`
-	Name string
-}
-
-type HostPort struct {
-	Id     int
-	HostId int
-	Port   int
-}
-
-type Container struct {
-	Id          int
-	Port        int
-	ContainerId string
-	DaemonId    string
-	HostId      int
-	AppId       int
-}
-
-type User struct {
-	Id   int
-	Name string
-}
 
 type Application struct {
 	Id      int
@@ -66,26 +40,6 @@ type AppYaml struct {
 }
 
 type ConfigYaml map[string]interface{}
-
-// models 初始化
-// 连接 mysql
-// 连接 etcd
-func init() {
-	// mysql
-	orm.RegisterDataBase(config.Db.Name, config.Db.Use, config.Db.Url, 30)
-	orm.RegisterModel(new(Application), new(User), new(Host), new(Container), new(HostPort))
-	orm.RunSyncdb(config.Db.Name, false, false)
-	db = orm.NewOrm()
-
-	// etcd
-	etcdClient = etcd.NewClient(config.Etcd.Machines)
-	if config.Etcd.Sync {
-		etcdClient.SyncCluster()
-	}
-
-	// Mutex
-	portMutex = sync.Mutex{}
-}
 
 // Application
 func (self *Application) TableUnique() [][]string {
@@ -114,12 +68,12 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	var testConfigYamlJson = make(ConfigYaml)
 
 	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &oconfigYamlJson); err1 != nil || err2 != nil {
-		logger.Debug("app.yaml error: ", err1)
-		logger.Debug("config.yaml error: ", err2)
+		Logger.Debug("app.yaml error: ", err1)
+		Logger.Debug("config.yaml error: ", err2)
 		return nil
 	}
-	logger.Debug("app.yaml: ", appYamlJson)
-	logger.Debug("config.yaml: ", oconfigYamlJson)
+	Logger.Debug("app.yaml: ", appYamlJson)
+	Logger.Debug("config.yaml: ", oconfigYamlJson)
 
 	for k, v := range oconfigYamlJson {
 		copyConfigYamlJson[k] = v
@@ -132,7 +86,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	if _, id, err := db.ReadOrCreate(&user, "Name"); err == nil {
 		user.Id = int(id)
 	} else {
-		logger.Info("create user failed", err)
+		Logger.Info("create user failed", err)
 		return nil
 	}
 
@@ -152,7 +106,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 					// 没得可以分配的, 先写这个吧, 一定会挂
 					testConfigYamlJson["mysql"] = d
 				} else {
-					logger.Info("mysql create failed")
+					Logger.Info("mysql create failed")
 				}
 			}
 		}
@@ -164,7 +118,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 					// 没得可以分配的, 先写这个吧, 一定会挂
 					testConfigYamlJson["redis"] = d
 				} else {
-					logger.Info("redis create failed")
+					Logger.Info("redis create failed")
 				}
 			}
 		}
@@ -230,7 +184,7 @@ func (self *Application) GetOrCreateDbInfo(kind string, createFunction func(*App
 
 func (self *Application) CreateDNS() error {
 	dns := make(map[string]string)
-	dns["host"] = config.Masteraddr
+	dns["host"] = config.Config.Masteraddr
 	cpath := fmt.Sprintf("/skydns/com/hunantv/intra/%s", self.Name)
 	_, err := etcdClient.Create(cpath, "", 0)
 	if err != nil {
@@ -300,162 +254,46 @@ func (self *Application) Hosts() []*Host {
 	return hosts
 }
 
-// User
-func (self *User) TableUnique() [][]string {
-	return [][]string{
-		[]string{"Name"},
-	}
-}
+func CreateMySQL(app *Application) (map[string]interface{}, error) {
+	// TODO 接入数据库
+	// businessCode := app.Name
+	// dbName := app.Name
+	// dbUid := app.Name
+	// dbPwd := "123"
+	t := time.Now().String()
+	code := CreateSha1HexValue([]byte(app.Name + app.Version + t))
 
-// Host
-func (self *Host) TableUnique() [][]string {
-	return [][]string{
-		[]string{"IP"},
-	}
-}
-
-func NewHost(ip, name string) *Host {
-	host := Host{IP: ip, Name: name}
-	if _, id, err := db.ReadOrCreate(&host, "IP"); err == nil {
-		host.Id = int(id)
-		return &host
-	}
-	return nil
-}
-
-func GetHostById(hostId int) *Host {
-	var host Host
-	err := db.QueryTable(new(Host)).Filter("Id", hostId).One(&host)
-	if err != nil {
-		return nil
-	}
-	return &host
-}
-
-func GetHostByIP(ip string) *Host {
-	var host Host
-	err := db.QueryTable(new(Host)).Filter("IP", ip).One(&host)
-	if err != nil {
-		return nil
-	}
-	return &host
-}
-
-// 注意里面可能有nil
-func GetHostsByIPs(ips []string) []*Host {
-	hosts := make([]*Host, len(ips))
-	for i, ip := range ips {
-		hosts[i] = GetHostByIP(ip)
-	}
-	return hosts
-}
-
-func (self *Host) Containers() []*Container {
-	var cs []*Container
-	db.QueryTable(new(Container)).Filter("HostId", self.Id).OrderBy("Port").All(&cs)
-	return cs
-}
-
-func (self *Host) Ports() []int {
-	var ports []*HostPort
-	db.QueryTable(new(HostPort)).Filter("HostId", self.Id).OrderBy("Port").All(&ports)
-	r := make([]int, len(ports))
-	for i := 0; i < len(ports); i = i + 1 {
-		r[i] = ports[i].Port
-	}
-	return r
-}
-
-func (self *Host) AddPort(port int) {
-	hostPort := HostPort{HostId: self.Id, Port: port}
-	db.Insert(&hostPort)
-}
-
-func (self *Host) RemovePort(port int) {
-	db.Raw("DELETE FROM host_port WHERE host_id=? AND port=?", self.Id, port).Exec()
-}
-
-// Container
-func (self *Container) TableIndex() [][]string {
-	return [][]string{
-		[]string{"AppId"},
-		[]string{"ContainerId"},
-		[]string{"host_id"}, /* TODO 有点tricky */
-	}
-}
-
-func (self *Container) Application() *Application {
-	return GetApplicationById(self.AppId)
-}
-
-func (self *Container) Host() *Host {
-	return GetHostById(self.HostId)
-}
-
-func (self *Container) Delete() bool {
-	host := self.Host()
-	if host != nil {
-		host.RemovePort(self.Port)
-	} else {
-		logger.Debug("Host not found when deleting container")
-		return false
-	}
-	if _, err := db.Delete(&Container{Id: self.Id}); err == nil {
-		return true
-	}
-	return false
-}
-
-func NewContainer(app *Application, host *Host, port int, containerId, daemonId string) *Container {
-	c := Container{Port: port, ContainerId: containerId, DaemonId: daemonId, AppId: app.Id, HostId: host.Id}
-	if _, err := db.Insert(&c); err == nil {
-		return &c
-	}
-	return nil
-}
-
-func GetContainerByCid(cid string) *Container {
-	var container Container
-	err := db.QueryTable(new(Container)).Filter("ContainerId", cid).One(&container)
-	if err != nil {
-		return nil
-	}
-	return &container
-}
-
-func GetContainerByHostAndApp(host *Host, app *Application) []*Container {
-	var cs []*Container
-	db.QueryTable(new(Container)).Filter("HostId", host.Id).Filter("AppId", app.Id).OrderBy("Port").All(&cs)
-	return cs
-}
-
-// 获取一个host上的可用的一个端口
-// 如果超出范围就返回0
-// 只允许一个访问
-func GetPortFromHost(host *Host) int {
-	lowerBound, upperBound := config.Minport, config.Maxport+1
-	portMutex.Lock()
-	defer portMutex.Unlock()
-	portList := make([]int, upperBound-lowerBound)
-	newPort := lowerBound
-
-	for _, port := range host.Ports() {
-		index := port - lowerBound
-		if index >= len(portList) || index < 0 {
-			continue
+	v := url.Values{}
+	v.Set("SysUid", config.Config.Dba.Sysuid)
+	v.Set("SysPwd", config.Config.Dba.Syspwd)
+	v.Set("businessCode", config.Config.Dba.Bcode)
+	v.Set("DbName", app.Name)
+	v.Set("DbUid", app.Name)
+	v.Set("DbPwd", code[:8])
+	if r, err := http.DefaultClient.PostForm(config.Config.Dba.Addr, v); err == nil {
+		defer r.Body.Close()
+		result, _ := ioutil.ReadAll(r.Body)
+		var d map[string]string
+		json.Unmarshal(result, &d)
+		if d["Result"] == "0" {
+			return nil, errors.New("create mysql failed")
 		}
-		portList[index] = port
-	}
-	for index, hold := range portList {
-		if hold == 0 {
-			newPort = lowerBound + index
-			break
-		}
-	}
-	if newPort >= upperBound {
-		return 0
+		ret := make(map[string]interface{})
+		ret["username"] = d["DbUser"]
+		ret["password"] = d["DbPwd"]
+		ret["host"] = d["IPAddress"]
+		ret["port"], _ = strconv.Atoi(d["Port"])
+		ret["db"] = d["DbName"]
+		return ret, nil
 	} else {
-		host.AddPort(newPort)
+		return nil, err
 	}
-	return newPort
+}
+
+func CreateRedis(app *Application) (map[string]interface{}, error) {
+	// TODO 接入redis
+	r := make(map[string]interface{})
+	r["host"] = "10.1.201.88"
+	r["port"] = time.Now().Nanosecond()%13 + 2000
+	return r, nil
 }
