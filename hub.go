@@ -167,11 +167,14 @@ func (self *Hub) Close() {
 
 func (self *Hub) Dispatch(host string, task *models.Task) error {
 	levi, ok := self.levis[host]
-	if !ok || levi == nil {
-		return errors.New(fmt.Sprintf("%s levi not exists", host))
-	}
 	if task == nil {
 		return errors.New("task is nil")
+	}
+	if !ok || levi == nil {
+		if st := models.GetStoredTaskById(task.Id); st != nil {
+			st.Done(models.FAIL, "failed cuz no levi alive")
+		}
+		return errors.New(fmt.Sprintf("%s levi not exists", host))
 	}
 	levi.inTask <- task
 	return nil
