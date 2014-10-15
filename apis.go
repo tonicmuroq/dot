@@ -22,11 +22,12 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	projectname := req.URL.Query().Get(":projectname")
 	version := req.URL.Query().Get(":version")
+	group := req.Form.Get("group")
 	appyaml := req.Form.Get("appyaml")
 	configyaml := req.Form.Get("configyaml")
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	if app := models.NewApplication(projectname, version, appyaml, configyaml); app == nil {
+	if app := models.NewApplication(projectname, version, group, appyaml, configyaml); app == nil {
 		r["r"] = 1
 		r["msg"] = "error"
 	}
@@ -75,9 +76,8 @@ func BuildImageHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "no such app"
 	} else {
-		group := req.Form.Get("group")
 		base := req.Form.Get("base")
-		task := models.BuildImageTask(app, group, base)
+		task := models.BuildImageTask(app, base)
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
