@@ -25,6 +25,8 @@ type Application struct {
 	Version string
 	Pname   string
 	User    *User `orm:"rel(fk)"`
+	Group   string
+	Created time.Time `orm:"auto_now_add;type(datetime)"`
 }
 
 type AppYaml struct {
@@ -56,7 +58,7 @@ func GetApplicationById(appId int) *Application {
 	return &app
 }
 
-func NewApplication(projectname, version, appyaml, configyaml string) *Application {
+func NewApplication(projectname, version, group, appyaml, configyaml string) *Application {
 	// 调整yaml
 	if configyaml == "" {
 		configyaml = "{}"
@@ -82,7 +84,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	// 生成新用户
 	appName := appYamlJson.Appname
 
-	if app := GetApplicationByNameAndVersion(appName, Version); app != nil {
+	if app := GetApplicationByNameAndVersion(appName, version); app != nil {
 		// 已经有就不注册了
 		return app
 	}
@@ -96,7 +98,7 @@ func NewApplication(projectname, version, appyaml, configyaml string) *Applicati
 	}
 
 	// 用户绑定应用
-	app := Application{Name: appName, Version: version, Pname: projectname, User: &user}
+	app := Application{Name: appName, Version: version, Pname: projectname, Group: group, User: &user}
 	if _, err := db.Insert(&app); err != nil {
 		return nil
 	}

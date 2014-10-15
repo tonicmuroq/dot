@@ -4,6 +4,7 @@ import (
 	"../config"
 	. "../utils"
 	"strings"
+	"time"
 )
 
 const (
@@ -117,12 +118,14 @@ type TaskReply struct {
 }
 
 type StoredTask struct {
-	Id     int
-	AppId  int // 对应应用
-	Status int // 对应状态, Running/Done
-	Succ   int // 成功/失败
-	Kind   int // 类型, Add/Remove/Update/Build/Test
-	Result string
+	Id       int
+	AppId    int // 对应应用
+	Status   int // 对应状态, Running/Done
+	Succ     int // 成功/失败
+	Kind     int // 类型, Add/Remove/Update/Build/Test
+	Result   string
+	Created  time.Time `orm:"auto_now_add;type(datetime)"`
+	Finished time.Time `orm:"auto_now;type(datetime)"`
 }
 
 func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
@@ -382,7 +385,7 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 // build任务的version就是应用的version, 都是7位的git版本号
 // build任务的build就是应用的build
 // 也就是告诉dot, 我需要用base来构建group下的app应用
-func BuildImageTask(app *Application, group, base string) *Task {
+func BuildImageTask(app *Application, base string) *Task {
 	if app == nil {
 		return nil
 	}
@@ -404,7 +407,7 @@ func BuildImageTask(app *Application, group, base string) *Task {
 		Id:      st.Id,
 		Name:    app.Pname,
 		Version: app.Version,
-		Group:   group,
+		Group:   app.Group,
 		Base:    base,
 		Build:   appYaml.Build[0],
 		Static:  appYaml.Static,
