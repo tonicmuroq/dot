@@ -185,6 +185,27 @@ func UpdateApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	encoder.Encode(r)
 }
 
+func RemoveContainerHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	cid := req.URL.Query().Get(":cid")
+
+	r := JsonTmpl{"r": 0, "msg": "ok"}
+	container := models.GetContainerByCid(cid)
+	if container == nil {
+		r["r"] = 1
+		r["msg"] = "no such container"
+	} else {
+		host := container.Host()
+		task := models.RemoveContainerTask(container)
+		if err := hub.Dispatch(host.IP, task); err != nil {
+			r["r"] = 1
+			r["msg"] = err.Error()
+		}
+	}
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
+}
+
 func init() {
 	restServer = pat.New()
 	restServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
@@ -195,4 +216,6 @@ func init() {
 	restServer.Post("/app/:app/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
 	restServer.Post("/app/:app/:version/update", http.HandlerFunc(UpdateApplicationHandler))
 	restServer.Post("/app/:app/:version/remove", http.HandlerFunc(RemoveApplicationHandler))
+
+	restServer.Post("/container/:cid/remove", http.HandlerFunc(RemoveContainerHandler))
 }
