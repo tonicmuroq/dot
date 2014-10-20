@@ -1,35 +1,59 @@
 package main
 
-import "./models"
+import (
+	"./models"
+	"errors"
+)
 
-func DeployApplicationHelper(app *models.Application, hosts []*models.Host) error {
+func DeployApplicationHelper(app *models.Application, hosts []*models.Host) ([]int, error) {
 	var err error
+	taskIds := []int{}
 	for _, host := range hosts {
 		if host == nil {
 			continue
 		}
 		cs := models.GetContainerByHostAndApp(host, app)
 		if len(cs) == 0 {
-			err = hub.Dispatch(host.IP, models.AddContainerTask(app, host))
+			task := models.AddContainerTask(app, host)
+			if task != nil {
+				taskIds = append(taskIds, task.Id)
+				err = hub.Dispatch(host.IP, task)
+			} else {
+				err = errors.New("task created error")
+			}
 		} else {
 			for _, c := range cs {
-				err = hub.Dispatch(host.IP, models.UpdateContainerTask(c, app))
+				task := models.UpdateContainerTask(c, app)
+				if task != nil {
+					taskIds = append(taskIds, task.Id)
+					err = hub.Dispatch(host.IP, task)
+				} else {
+					err = errors.New("task created error")
+				}
 			}
 		}
 	}
-	return err
+	return taskIds, err
 }
 
-func RemoveApplicationFromHostHelper(app *models.Application, host *models.Host) error {
+func RemoveApplicationFromHostHelper(app *models.Application, host *models.Host) ([]int, error) {
 	var err error
+	taskIds := []int{}
 	for _, c := range models.GetContainerByHostAndApp(host, app) {
-		err = hub.Dispatch(host.IP, models.RemoveContainerTask(c))
+		task := models.RemoveContainerTask(c)
+		if task != nil {
+			taskIds = append(taskIds, task.Id)
+			err = hub.Dispatch(host.IP, task)
+		} else {
+			err = errors.New("task created error")
+		}
 	}
-	return err
+	return taskIds, err
 }
 
-func UpdateApplicationHelper(fromApp, toApp *models.Application, hosts []*models.Host) error {
+func UpdateApplicationHelper(fromApp, toApp *models.Application, hosts []*models.Host) ([]int, error) {
 	var err error
+	taskIds := []int{}
 	for _, host := range hosts {
 		if host == nil {
 			continue
@@ -37,9 +61,15 @@ func UpdateApplicationHelper(fromApp, toApp *models.Application, hosts []*models
 		oldContainers := models.GetContainerByHostAndApp(host, fromApp)
 		if len(oldContainers) > 0 {
 			for _, c := range oldContainers {
-				err = hub.Dispatch(host.IP, models.UpdateContainerTask(c, toApp))
+				task := models.UpdateContainerTask(c, toApp)
+				if task != nil {
+					taskIds = append(taskIds, task.Id)
+					err = hub.Dispatch(host.IP, task)
+				} else {
+					err = errors.New("task created error")
+				}
 			}
 		}
 	}
-	return err
+	return taskIds, err
 }
