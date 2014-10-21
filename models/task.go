@@ -18,8 +18,10 @@ const (
 	RUNNING = 0
 	DONE    = 1
 
-	SUCC = 0
-	FAIL = 1
+	// 原本的语义已经改了...
+	// 这个应该叫做 YES/NO
+	SUCC = 1
+	FAIL = 0
 )
 
 type BuildTask struct {
