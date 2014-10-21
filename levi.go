@@ -237,13 +237,19 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 		// 其他的add任务来看是不是成功
 		if st := models.GetStoredTaskById(task.Id); st != nil {
 			if !task.IsTest() {
+				// 非测试任务的Add返回值是容器id
 				if retval != "" {
 					st.Done(models.SUCC, retval)
 				} else {
 					st.Done(models.FAIL, retval)
 				}
 			} else {
-				st.SetResult(retval)
+				// 如果测试任务就没返回容器值, 那么直接挂
+				if retval != "" {
+					st.SetResult(retval)
+				} else {
+					st.Done(models.FAIL, "failed when create testing container")
+				}
 			}
 		}
 
