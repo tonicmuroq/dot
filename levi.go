@@ -214,7 +214,8 @@ func UpdateContainerStatus(host *models.Host, statuses []*models.StatusInfo) {
 		if status.Type == "die" {
 			Logger.Info("Should delete ", status.Id, " of ", status.Appname)
 			if c := models.GetContainerByCid(status.Id); c != nil {
-				hub.Dispatch(host.IP, models.RemoveContainerTask(c))
+				// 不要发了
+				// hub.Dispatch(host.IP, models.RemoveContainerTask(c))
 			} else {
 				Logger.Info("Container ", status.Id, " already removed")
 			}

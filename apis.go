@@ -56,6 +56,8 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
+		} else {
+			r["task_id"] = task.Id
 		}
 	}
 	encoder := json.NewEncoder(w)
@@ -81,6 +83,8 @@ func BuildImageHandler(w http.ResponseWriter, req *http.Request) {
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
+		} else {
+			r["task_id"] = task.Id
 		}
 	}
 	encoder := json.NewEncoder(w)
@@ -105,6 +109,8 @@ func TestImageHandler(w http.ResponseWriter, req *http.Request) {
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
+		} else {
+			r["task_id"] = task.Id
 		}
 	}
 	encoder := json.NewEncoder(w)
@@ -127,9 +133,11 @@ func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "app port is 0 or no daemon"
 	} else {
-		if err := DeployApplicationHelper(app, hosts); err != nil {
+		if taskIds, err := DeployApplicationHelper(app, hosts); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
+		} else {
+			r["task_ids"] = taskIds
 		}
 	}
 	encoder := json.NewEncoder(w)
@@ -149,9 +157,11 @@ func RemoveApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = "no such app"
 	} else {
-		if err := RemoveApplicationFromHostHelper(app, host); err != nil {
+		if taskIds, err := RemoveApplicationFromHostHelper(app, host); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
+		} else {
+			r["task_ids"] = taskIds
 		}
 	}
 	encoder := json.NewEncoder(w)
@@ -176,9 +186,11 @@ func UpdateApplicationHandler(w http.ResponseWriter, req *http.Request) {
 		r["r"] = 1
 		r["msg"] = fmt.Sprintf("no such app %s, %s", fromApp, toApp)
 	} else {
-		if err := UpdateApplicationHelper(fromApp, toApp, hosts); err != nil {
+		if taskIds, err := UpdateApplicationHelper(fromApp, toApp, hosts); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
+		} else {
+			r["task_ids"] = taskIds
 		}
 	}
 	encoder := json.NewEncoder(w)
@@ -200,6 +212,8 @@ func RemoveContainerHandler(w http.ResponseWriter, req *http.Request) {
 		if err := hub.Dispatch(host.IP, task); err != nil {
 			r["r"] = 1
 			r["msg"] = err.Error()
+		} else {
+			r["task_id"] = task.Id
 		}
 	}
 	encoder := json.NewEncoder(w)
