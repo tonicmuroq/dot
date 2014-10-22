@@ -6,7 +6,7 @@ type Container struct {
 	Id          int
 	Port        int
 	ContainerId string
-	DaemonId    string
+	IdentId     string
 	HostId      int
 	AppId       int
 }
@@ -43,7 +43,7 @@ func (self *Container) Delete() bool {
 }
 
 func NewContainer(app *Application, host *Host, port int, containerId, daemonId string) *Container {
-	c := Container{Port: port, ContainerId: containerId, DaemonId: daemonId, AppId: app.Id, HostId: host.Id}
+	c := Container{Port: port, ContainerId: containerId, IdentId: daemonId, AppId: app.Id, HostId: host.Id}
 	if _, err := db.Insert(&c); err == nil {
 		return &c
 	}

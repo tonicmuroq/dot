@@ -339,7 +339,7 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 
 	var bind int
 	var daemonId string
-	if container.DaemonId != "" {
+	if container.IdentId != "" {
 		bind = 0
 		daemonId = CreateRandomHexString(app.Name, 7)
 	} else {
