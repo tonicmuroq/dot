@@ -161,9 +161,9 @@ func (self *Levi) Run() {
 						continue
 					}
 					if testResult.ExitCode == 0 {
-						st.Done(models.SUCC, testResult.Err)
+						st.Done(models.SUCC, fmt.Sprintf("%s|%s", container.IdentId, testResult.Err))
 					} else {
-						st.Done(models.FAIL, testResult.Err)
+						st.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentId, testResult.Err))
 					}
 					container.Delete()
 				}
