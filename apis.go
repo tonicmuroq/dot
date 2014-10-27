@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/bmizerany/pat"
 )
@@ -26,12 +25,9 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	group := req.Form.Get("group")
 	appyaml := req.Form.Get("appyaml")
 	configyaml := req.Form.Get("configyaml")
-	projectId := req.Form.Get("pid")
-
-	pid, _ := strconv.Atoi(projectId)
 
 	r := JsonTmpl{"r": 0, "msg": "ok"}
-	if app := models.NewApplication(projectname, version, group, appyaml, configyaml, pid); app == nil {
+	if app := models.NewApplication(projectname, version, group, appyaml, configyaml); app == nil {
 		r["r"] = 1
 		r["msg"] = "error"
 	}
