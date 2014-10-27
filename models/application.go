@@ -20,13 +20,14 @@ const (
 )
 
 type Application struct {
-	Id      int
-	Name    string
-	Version string
-	Pname   string
-	User    *User `orm:"rel(fk)"`
-	Group   string
-	Created time.Time `orm:"auto_now_add;type(datetime)"`
+	Id        int
+	Name      string
+	Version   string
+	Pname     string
+	User      *User `orm:"rel(fk)"`
+	Group     string
+	Created   time.Time `orm:"auto_now_add;type(datetime)"`
+	ProjectId int
 }
 
 type AppYaml struct {
@@ -58,7 +59,7 @@ func GetApplicationById(appId int) *Application {
 	return &app
 }
 
-func NewApplication(projectname, version, group, appyaml, configyaml string) *Application {
+func NewApplication(projectname, version, group, appyaml, configyaml string, projectId int) *Application {
 	// 调整yaml
 	if configyaml == "" {
 		configyaml = "{}"
@@ -98,7 +99,7 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 	}
 
 	// 用户绑定应用
-	app := Application{Name: appName, Version: version, Pname: projectname, Group: group, User: &user}
+	app := Application{Name: appName, Version: version, Pname: projectname, Group: group, User: &user, ProjectId: projectId}
 	if _, err := db.Insert(&app); err != nil {
 		return nil
 	}
