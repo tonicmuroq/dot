@@ -249,10 +249,10 @@ func (self *Application) Containers() []*Container {
 	return cs
 }
 
-func (self *Application) Hosts() []*Host {
+func (self *Application) AllVersionHosts() []*Host {
 	var rs orm.ParamsList
 	var hosts []*Host
-	_, err := db.Raw("SELECT distinct(host_id) FROM container WHERE app_id=?", self.Id).ValuesFlat(&rs)
+	_, err := db.Raw("SELECT distinct(host_id) FROM container WHERE name=?", self.Name).ValuesFlat(&rs)
 	if err == nil && len(rs) > 0 {
 		db.QueryTable(new(Host)).Filter("id__in", rs).All(&hosts)
 	}

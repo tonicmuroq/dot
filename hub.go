@@ -112,7 +112,7 @@ func (self *Hub) RestartNginx() {
 				Hosts: []string{},
 			}
 
-			hosts := app.Hosts()
+			hosts := app.AllVersionHosts()
 
 			if len(hosts) == 0 {
 				EnsureFileAbsent(conf)
