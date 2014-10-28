@@ -9,6 +9,7 @@ type Container struct {
 	IdentId     string
 	HostId      int
 	AppId       int
+	AppName     string
 }
 
 // Container
@@ -16,6 +17,7 @@ func (self *Container) TableIndex() [][]string {
 	return [][]string{
 		[]string{"AppId"},
 		[]string{"ContainerId"},
+		[]string{"AppName"},
 		[]string{"host_id"}, /* TODO 有点tricky */
 	}
 }
@@ -43,7 +45,14 @@ func (self *Container) Delete() bool {
 }
 
 func NewContainer(app *Application, host *Host, port int, containerId, daemonId string) *Container {
-	c := Container{Port: port, ContainerId: containerId, IdentId: daemonId, AppId: app.Id, HostId: host.Id}
+	c := Container{
+		Port:        port,
+		ContainerId: containerId,
+		IdentId:     daemonId,
+		AppId:       app.Id,
+		HostId:      host.Id,
+		AppName:     app.Name,
+	}
 	if _, err := db.Insert(&c); err == nil {
 		return &c
 	}
