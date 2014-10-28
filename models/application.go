@@ -39,6 +39,7 @@ type AppYaml struct {
 	Services []string `json:services`
 	Static   string   `json:static`
 	Daemon   bool     `json:daemon`
+	Schema   string   `json:schema`
 }
 
 type ConfigYaml map[string]interface{}
