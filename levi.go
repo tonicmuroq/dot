@@ -286,6 +286,8 @@ func doBuild(app *models.Application, host *models.Host, tasks []*models.BuildTa
 		if st := models.GetStoredTaskById(task.Id); st != nil {
 			if retval != "" {
 				st.Done(models.SUCC, retval)
+				// 返回值是image地址
+				app.SetImageAddr(retval)
 			} else {
 				st.Done(models.FAIL, retval)
 			}
