@@ -86,7 +86,6 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 	appName := appYamlJson.Appname
 
 	if app := GetApplicationByNameAndVersion(appName, version); app != nil {
-		// 已经有就不注册了
 		return app
 	}
 
@@ -174,6 +173,7 @@ func (self *Application) GetOrCreateDbInfo(kind string, createFunction func(*App
 	if _, err := etcdClient.Create(cpath, "", 0); err == nil {
 		db, err := createFunction(self)
 		if err != nil {
+			Logger.Info(err)
 			return ""
 		}
 		if json, err := JSONEncode(db); err == nil {
@@ -182,6 +182,7 @@ func (self *Application) GetOrCreateDbInfo(kind string, createFunction func(*App
 		}
 		return ""
 	} else {
+		Logger.Info(err)
 		if r, err := etcdClient.Get(cpath, false, false); err == nil {
 			return r.Node.Value
 		}
@@ -277,9 +278,13 @@ func CreateMySQL(app *Application) (map[string]interface{}, error) {
 		result, _ := ioutil.ReadAll(r.Body)
 		var d map[string]string
 		json.Unmarshal(result, &d)
+
+		Logger.Info("ret from DBA: ", d)
+
 		if d["Result"] == "0" {
 			return nil, errors.New("create mysql failed")
 		}
+
 		ret := make(map[string]interface{})
 		ret["username"] = d["DbUser"]
 		ret["password"] = d["DbPwd"]
@@ -288,6 +293,7 @@ func CreateMySQL(app *Application) (map[string]interface{}, error) {
 		ret["db"] = d["DbName"]
 		return ret, nil
 	} else {
+		Logger.Info("create mysql error: ", err)
 		return nil, err
 	}
 }
