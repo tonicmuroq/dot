@@ -20,13 +20,14 @@ const (
 )
 
 type Application struct {
-	Id      int
-	Name    string
-	Version string
-	Pname   string
-	User    *User `orm:"rel(fk)"`
-	Group   string
-	Created time.Time `orm:"auto_now_add;type(datetime)"`
+	Id        int
+	Name      string
+	Version   string
+	Pname     string
+	User      *User `orm:"rel(fk)"`
+	Group     string
+	Created   time.Time `orm:"auto_now_add;type(datetime)"`
+	ImageAddr string
 }
 
 type AppYaml struct {
@@ -243,6 +244,11 @@ func (self *Application) GetConfigYaml() (*ConfigYaml, error) {
 
 func (self *Application) UserUid() int {
 	return self.User.Id
+}
+
+func (self *Application) SetImageAddr(addr string) {
+	self.ImageAddr = addr
+	db.Update(self)
 }
 
 func (self *Application) Containers() []*Container {
