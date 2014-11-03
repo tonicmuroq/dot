@@ -1,9 +1,6 @@
 package main
 
 import (
-	"./config"
-	"./models"
-	. "./utils"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,6 +11,10 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"./config"
+	"./models"
+	. "./utils"
 
 	"github.com/gorilla/websocket"
 )
@@ -45,7 +46,6 @@ type Hub struct {
 	appIds        []int
 	done          chan int
 	immediate     chan bool
-	closed        chan bool
 	size          int
 	finished      bool
 }
@@ -77,12 +77,6 @@ func (self *Hub) Run() {
 				Logger.Info("restart nginx on full")
 				self.RestartNginx()
 			}
-		case <-self.closed:
-			if len(self.appIds) != 0 {
-				Logger.Info("restart nginx on close")
-				self.RestartNginx()
-			}
-			self.finished = true
 		case <-time.After(time.Second * time.Duration(config.Config.Task.Dispatch)):
 			if len(self.appIds) != 0 {
 				Logger.Info("restart nginx on schedule")
@@ -162,7 +156,7 @@ func (self *Hub) Close() {
 	for _, levi := range self.levis {
 		levi.Close()
 	}
-	self.closed <- true
+	self.finished = true
 }
 
 func (self *Hub) Dispatch(host string, task *models.Task) error {
@@ -185,7 +179,6 @@ var hub = &Hub{
 	lastCheckTime: make(map[string]time.Time),
 	appIds:        []int{},
 	done:          make(chan int),
-	closed:        make(chan bool),
 	immediate:     make(chan bool),
 	size:          10,
 	finished:      false,

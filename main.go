@@ -1,13 +1,14 @@
 package main
 
 import (
-	"./config"
-	"./models"
-	. "./utils"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"./config"
+	"./models"
+	. "./utils"
 )
 
 func main() {
@@ -25,13 +26,12 @@ func main() {
 		Logger.Assert(err, "http")
 	}
 
-	go func() {
-		sc := make(chan os.Signal, 1)
-		signal.Notify(sc, os.Interrupt)
-		signal.Notify(sc, syscall.SIGTERM)
-		signal.Notify(sc, syscall.SIGHUP)
-		Logger.Info("Got <-", <-sc)
-		hub.Close()
-		os.Exit(0)
-	}()
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, os.Interrupt)
+	signal.Notify(sc, syscall.SIGTERM)
+	signal.Notify(sc, syscall.SIGHUP)
+	signal.Notify(sc, syscall.SIGKILL)
+	signal.Notify(sc, syscall.SIGQUIT)
+	Logger.Info("Got <-", <-sc)
+	hub.Close()
 }
