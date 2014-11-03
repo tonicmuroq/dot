@@ -1,13 +1,14 @@
 package main
 
 import (
-	"./config"
-	"./models"
-	. "./utils"
 	"fmt"
 	"path"
 	"sync"
 	"time"
+
+	"./config"
+	"./models"
+	. "./utils"
 
 	"code.google.com/p/go-uuid/uuid"
 )
@@ -15,12 +16,12 @@ import (
 type Levi struct {
 	conn      *Connection
 	inTask    chan *models.Task
-	closed    chan bool
 	immediate chan bool
 	host      string
 	size      int
 	tasks     map[string]*models.GroupedTask
 	waiting   map[string]*models.LeviGroupedTask
+	running   bool
 	wg        *sync.WaitGroup
 }
 
@@ -28,12 +29,12 @@ func NewLevi(conn *Connection, size int) *Levi {
 	return &Levi{
 		conn:      conn,
 		inTask:    make(chan *models.Task),
-		closed:    make(chan bool),
 		immediate: make(chan bool),
 		host:      conn.host,
 		size:      size,
 		tasks:     make(map[string]*models.GroupedTask),
 		waiting:   make(map[string]*models.LeviGroupedTask),
+		running:   true,
 		wg:        &sync.WaitGroup{},
 	}
 }
@@ -44,18 +45,14 @@ func (self *Levi) Host() *models.Host {
 
 func (self *Levi) WaitTask() {
 	defer self.wg.Done()
-	finish := false
-	for !finish {
+	var task *models.Task
+	for !self.running {
 		select {
-		case task, ok := <-self.inTask:
-			Logger.Debug("levi got task ", task, ok)
+		case task, self.running = <-self.inTask:
+			Logger.Debug("levi got task ", task, self.running)
 			if task == nil {
 				// 有nil, 无视掉
 				break
-			}
-			if !ok {
-				// 有错, 关掉
-				finish = true
 			}
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Version)
 			if _, exists := self.tasks[key]; !exists {
@@ -72,12 +69,6 @@ func (self *Levi) WaitTask() {
 				Logger.Debug("send tasks when full")
 				self.SendTasks()
 			}
-		case <-self.closed:
-			if self.Len() != 0 {
-				Logger.Debug("send tasks before close")
-				self.SendTasks()
-			}
-			finish = true
 		case <-self.immediate:
 			if self.Len() > 0 {
 				Logger.Debug("send tasks immediate")
@@ -94,10 +85,9 @@ func (self *Levi) WaitTask() {
 
 func (self *Levi) Close() {
 	self.wg.Add(1)
+	self.running = false
 	self.inTask <- nil
-	self.closed <- true
 	close(self.inTask)
-	close(self.closed)
 	close(self.immediate)
 	self.wg.Wait()
 	self.conn.CloseConnection()
