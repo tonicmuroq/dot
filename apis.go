@@ -2,6 +2,7 @@ package main
 
 import (
 	"./models"
+	"./resources"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +11,7 @@ import (
 	"github.com/bmizerany/pat"
 )
 
-var restServer *pat.PatternServeMux
+var RestServer *pat.PatternServeMux
 
 type JsonTmpl map[string]interface{}
 
@@ -184,7 +185,7 @@ func UpdateApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	hosts := models.GetHostsByIPs(ips)
 	if fromApp == nil || toApp == nil {
 		r["r"] = 1
-		r["msg"] = fmt.Sprintf("no such app %s, %s", fromApp, toApp)
+		r["msg"] = fmt.Sprintf("no such app %v, %v", fromApp, toApp)
 	} else {
 		if taskIds, err := UpdateApplicationHelper(fromApp, toApp, hosts); err != nil {
 			r["r"] = 1
@@ -220,16 +221,39 @@ func RemoveContainerHandler(w http.ResponseWriter, req *http.Request) {
 	encoder.Encode(r)
 }
 
-func init() {
-	restServer = pat.New()
-	restServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
-	restServer.Post("/app/:projectname/:version", http.HandlerFunc(RegisterApplicationHandler))
-	restServer.Post("/app/:app/:version/add", http.HandlerFunc(AddContainerHandler))
-	restServer.Post("/app/:app/:version/build", http.HandlerFunc(BuildImageHandler))
-	restServer.Post("/app/:app/:version/test", http.HandlerFunc(TestImageHandler))
-	restServer.Post("/app/:app/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
-	restServer.Post("/app/:app/:version/update", http.HandlerFunc(UpdateApplicationHandler))
-	restServer.Post("/app/:app/:version/remove", http.HandlerFunc(RemoveApplicationHandler))
+func NewMySQLInstanceHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
 
-	restServer.Post("/container/:cid/remove", http.HandlerFunc(RemoveContainerHandler))
+	r := JsonTmpl{"r": 1, "msg": "", "mysql": nil}
+	if app := models.GetApplicationByNameAndVersion(name, version); app != nil {
+		if mysql, err := resources.NewMySQLInstance(app.Name); err == nil {
+			r["r"] = 0
+			r["mysql"] = mysql
+		} else {
+			r["msg"] = err.Error()
+		}
+	} else {
+		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
+	}
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
+}
+
+func init() {
+	RestServer = pat.New()
+	RestServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
+
+	RestServer.Post("/app/:projectname/:version", http.HandlerFunc(RegisterApplicationHandler))
+	RestServer.Post("/app/:app/:version/add", http.HandlerFunc(AddContainerHandler))
+	RestServer.Post("/app/:app/:version/build", http.HandlerFunc(BuildImageHandler))
+	RestServer.Post("/app/:app/:version/test", http.HandlerFunc(TestImageHandler))
+	RestServer.Post("/app/:app/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
+	RestServer.Post("/app/:app/:version/update", http.HandlerFunc(UpdateApplicationHandler))
+	RestServer.Post("/app/:app/:version/remove", http.HandlerFunc(RemoveApplicationHandler))
+
+	RestServer.Post("/container/:cid/remove", http.HandlerFunc(RemoveContainerHandler))
+
+	RestServer.Post("/resource/:app/:version/mysql", http.HandlerFunc(NewMySQLInstanceHandler))
 }

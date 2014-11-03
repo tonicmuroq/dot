@@ -18,7 +18,7 @@ func main() {
 	go hub.CheckAlive()
 	go hub.Run()
 
-	http.Handle("/", restServer)
+	http.Handle("/", RestServer)
 	http.HandleFunc("/ws", ServeWs)
 
 	err := http.ListenAndServe(config.Config.Bind, nil)
