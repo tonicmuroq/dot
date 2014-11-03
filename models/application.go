@@ -3,15 +3,10 @@ package models
 import (
 	"../config"
 	. "../utils"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/astaxie/beego/orm"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"path"
-	"strconv"
 	"time"
 )
 
@@ -61,103 +56,46 @@ func GetApplicationById(appId int) *Application {
 }
 
 func NewApplication(projectname, version, group, appyaml, configyaml string) *Application {
-	// 调整yaml
 	if configyaml == "" {
 		configyaml = "{}"
 	}
 	var appYamlJson AppYaml
-	var oconfigYamlJson ConfigYaml
-	var copyConfigYamlJson = make(ConfigYaml)
-	var testConfigYamlJson = make(ConfigYaml)
+	var configYamlJson ConfigYaml
 
-	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &oconfigYamlJson); err1 != nil || err2 != nil {
-		Logger.Debug("app.yaml error: ", err1)
-		Logger.Debug("config.yaml error: ", err2)
+	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &configYamlJson); err1 != nil || err2 != nil {
+		Logger.Info("app.yaml error: ", err1)
+		Logger.Info("config.yaml error: ", err2)
 		return nil
 	}
 	Logger.Debug("app.yaml: ", appYamlJson)
-	Logger.Debug("config.yaml: ", oconfigYamlJson)
+	Logger.Debug("config.yaml: ", configYamlJson)
 
-	for k, v := range oconfigYamlJson {
-		copyConfigYamlJson[k] = v
-		testConfigYamlJson[k] = v
-	}
-
-	// 生成新用户
 	appName := appYamlJson.Appname
 
 	if app := GetApplicationByNameAndVersion(appName, version); app != nil {
+		Logger.Info("App already registered: ", app)
 		return app
 	}
 
-	user := User{Name: appName}
-	if _, id, err := db.ReadOrCreate(&user, "Name"); err == nil {
-		user.Id = int(id)
-	} else {
-		Logger.Info("create user failed", err)
+	// 生成新用户
+	user := NewUser(appName)
+	if user == nil {
 		return nil
 	}
 
 	// 用户绑定应用
-	app := Application{Name: appName, Version: version, Pname: projectname, Group: group, User: &user}
+	app := Application{Name: appName, Version: version, Pname: projectname, Group: group, User: user}
 	if _, err := db.Insert(&app); err != nil {
+		Logger.Info("Create App error: ", err)
 		return nil
 	}
 
-	// 配置文件更改
-	for _, service := range appYamlJson.Services {
-		if service == "mysql" {
-			if dbInfoString := app.GetOrCreateDbInfo("mysql", CreateMySQL); dbInfoString != "" {
-				var d map[string]interface{}
-				if err := JSONDecode(dbInfoString, &d); err == nil {
-					oconfigYamlJson["mysql"] = d
-					// 没得可以分配的, 先写这个吧, 一定会挂
-					testConfigYamlJson["mysql"] = d
-				} else {
-					Logger.Info("mysql create failed")
-				}
-			}
-		}
-		if service == "redis" {
-			if dbInfoString := app.GetOrCreateDbInfo("redis", CreateRedis); dbInfoString != "" {
-				var d map[string]interface{}
-				if err := JSONDecode(dbInfoString, &d); err == nil {
-					oconfigYamlJson["redis"] = d
-					// 没得可以分配的, 先写这个吧, 一定会挂
-					testConfigYamlJson["redis"] = d
-				} else {
-					Logger.Info("redis create failed")
-				}
-			}
-		}
-	}
-
-	if newConfigYaml, err := YAMLEncode(oconfigYamlJson); err == nil {
-		etcdClient.Create((&app).GetYamlPath("config"), newConfigYaml, 0)
+	if configYaml, err := YAMLEncode(configYamlJson); err == nil {
+		etcdClient.Create((&app).GetYamlPath("config"), configYaml, 0)
 	}
 	if appYaml, err := YAMLEncode(appYamlJson); err == nil {
 		etcdClient.Create((&app).GetYamlPath("app"), appYaml, 0)
 	}
-	if configYaml, err := YAMLEncode(copyConfigYamlJson); err == nil {
-		if len(configYaml) == 0 {
-			etcdClient.Create((&app).GetYamlPath("original-config"), "", 0)
-		} else {
-			etcdClient.Create((&app).GetYamlPath("original-config"), configYaml, 0)
-		}
-	}
-	if configYaml, err := YAMLEncode(testConfigYamlJson); err == nil {
-		if len(configYaml) == 0 {
-			etcdClient.Create((&app).GetYamlPath("test"), "", 0)
-		} else {
-			etcdClient.Create((&app).GetYamlPath("test"), configYaml, 0)
-		}
-	}
-
-	// 生成必须路径
-	etcdClient.CreateDir(path.Join(appPathPrefix, "_Apps", app.Name, "daemons"), 0)
-	etcdClient.CreateDir(path.Join(appPathPrefix, "_Apps", app.Name, "apps"), 0)
-	etcdClient.CreateDir(path.Join(appPathPrefix, "_Apps", app.Name, "tests"), 0)
-
 	return &app
 }
 
@@ -167,28 +105,6 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 		return nil
 	}
 	return &app
-}
-
-func (self *Application) GetOrCreateDbInfo(kind string, createFunction func(*Application) (map[string]interface{}, error)) string {
-	cpath := path.Join(appPathPrefix, self.Name, kind)
-	if _, err := etcdClient.Create(cpath, "", 0); err == nil {
-		db, err := createFunction(self)
-		if err != nil {
-			Logger.Info(err)
-			return ""
-		}
-		if json, err := JSONEncode(db); err == nil {
-			etcdClient.Set(cpath, json, 0)
-			return json
-		}
-		return ""
-	} else {
-		Logger.Info(err)
-		if r, err := etcdClient.Get(cpath, false, false); err == nil {
-			return r.Node.Value
-		}
-		return ""
-	}
 }
 
 func (self *Application) CreateDNS() error {
@@ -265,49 +181,4 @@ func (self *Application) AllVersionHosts() []*Host {
 		db.QueryTable(new(Host)).Filter("id__in", rs).All(&hosts)
 	}
 	return hosts
-}
-
-func CreateMySQL(app *Application) (map[string]interface{}, error) {
-
-	password := CreateSha1HexValue([]byte(app.Name + app.Version + time.Now().String()))
-
-	form := url.Values{}
-	form.Set("SysUid", config.Config.Dba.Sysuid)
-	form.Set("SysPwd", config.Config.Dba.Syspwd)
-	form.Set("businessCode", config.Config.Dba.Bcode)
-	form.Set("DbName", app.Name)
-	form.Set("DbUid", app.Name)
-	form.Set("DbPwd", password[:8])
-
-	if r, err := http.DefaultClient.PostForm(config.Config.Dba.Addr, form); err == nil {
-		defer r.Body.Close()
-		result, _ := ioutil.ReadAll(r.Body)
-		var d map[string]string
-		json.Unmarshal(result, &d)
-
-		Logger.Info("ret from DBA: ", d)
-
-		if d["Result"] == "0" {
-			return nil, errors.New("create mysql failed")
-		}
-
-		ret := make(map[string]interface{})
-		ret["username"] = d["DbUser"]
-		ret["password"] = d["DbPwd"]
-		ret["host"] = d["IPAddress"]
-		ret["port"], _ = strconv.Atoi(d["Port"])
-		ret["db"] = d["DbName"]
-		return ret, nil
-	} else {
-		Logger.Info("create mysql error: ", err)
-		return nil, err
-	}
-}
-
-func CreateRedis(app *Application) (map[string]interface{}, error) {
-	// TODO 接入redis
-	r := make(map[string]interface{})
-	r["host"] = "10.1.201.88"
-	r["port"] = time.Now().Nanosecond()%13 + 2000
-	return r, nil
 }
