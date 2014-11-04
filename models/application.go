@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/astaxie/beego/orm"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -90,6 +91,12 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 		return nil
 	}
 
+	// 清理config里的mysql/redis配置
+	for key, _ := range configYamlJson {
+		if strings.HasPrefix(key, "mysql") || strings.HasPrefix(key, "redis") {
+			delete(configYamlJson, key)
+		}
+	}
 	if configYaml, err := YAMLEncode(configYamlJson); err == nil {
 		etcdClient.Create((&app).GetYamlPath("config"), configYaml, 0)
 	}
