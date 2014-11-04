@@ -97,6 +97,15 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 			delete(configYamlJson, key)
 		}
 	}
+
+	// 注册过程如果已经有了mysql/redis那么复制过去
+	if mysql := app.GetDBInfo("mysql"); mysql != nil {
+		configYamlJson["mysql"] = mysql
+	}
+	if redis := app.GetDBInfo("redis"); redis != nil {
+		configYamlJson["redis"] = redis
+	}
+
 	if configYaml, err := YAMLEncode(configYamlJson); err == nil {
 		etcdClient.Create((&app).GetYamlPath("config"), configYaml, 0)
 	}
@@ -188,4 +197,15 @@ func (self *Application) AllVersionHosts() []*Host {
 		db.QueryTable(new(Host)).Filter("id__in", rs).All(&hosts)
 	}
 	return hosts
+}
+
+func (self *Application) GetDBInfo(kind string) map[string]interface{} {
+	cpath := path.Join(appPathPrefix, self.Name, kind)
+	if r, err := etcdClient.Get(cpath, false, false); err == nil {
+		var d map[string]interface{}
+		JSONDecode(r.Node.Value, &d)
+		return d
+	} else {
+		return nil
+	}
 }
