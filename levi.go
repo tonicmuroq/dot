@@ -46,7 +46,7 @@ func (self *Levi) Host() *models.Host {
 func (self *Levi) WaitTask() {
 	defer self.wg.Done()
 	var task *models.Task
-	for !self.running {
+	for self.running {
 		select {
 		case task, self.running = <-self.inTask:
 			Logger.Debug("levi got task ", task, self.running)
