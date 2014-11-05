@@ -251,12 +251,7 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 			Logger.Debug("Test output stream: ", retval)
 		case true:
 			if task.IsTest() {
-				Logger.Info("Test result")
-				containerId := st.Result
-				Logger.Debug("test result ", retval)
-				Logger.Debug("test container id ", containerId)
-				container := models.GetContainerByCid(containerId)
-				Logger.Debug("test container ", container)
+				container := models.GetContainerByCid(st.Result)
 				if container == nil {
 					return
 				}
@@ -275,9 +270,6 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 
 func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
-
-	Logger.Debug("build tasks[i]: ", task)
-	Logger.Debug("build taskReplies[i]: ", retval)
 
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
@@ -308,9 +300,6 @@ func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.Ta
 
 func doRemove(tasks []*models.RemoveTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
-
-	Logger.Debug("remove tasks[i]: ", task)
-	Logger.Debug("remove taskReplies[i]: ", retval)
 
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
