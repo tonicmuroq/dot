@@ -22,6 +22,12 @@ const (
 	// 这个应该叫做 YES/NO
 	SUCC = 1
 	FAIL = 0
+
+	ADD_TASK    = 1
+	REMOVE_TASK = 2
+	BUILD_TASK  = 3
+	INFO_TASK   = 4
+	TEST_TASK   = 5
 )
 
 type BuildTask struct {
@@ -99,24 +105,19 @@ type LeviGroupedTask struct {
 	Tasks   *LeviTasks
 }
 
-type TestResult struct {
-	ExitCode int
-	Err      string
-}
-
 type StatusInfo struct {
 	Type    string
 	Appname string
 	Id      string
 }
 
+// sent back from Levi
 type TaskReply struct {
-	Id     string
-	Build  []string
-	Add    []string
-	Remove []bool
-	Test   map[string]*TestResult
-	Status []*StatusInfo
+	Id    string
+	Done  bool
+	Index int
+	Type  int
+	Data  string
 }
 
 type StoredTask struct {
@@ -128,6 +129,31 @@ type StoredTask struct {
 	Result   string
 	Created  time.Time `orm:"auto_now_add;type(datetime)"`
 	Finished time.Time `orm:"auto_now;type(datetime)"`
+}
+
+func (self *LeviTasks) Done() bool {
+	sumLength := len(self.Build) + len(self.Add) + len(self.Remove)
+	if sumLength == 0 {
+		// 本身就是空的
+		return false
+	} else {
+		for _, build := range self.Build {
+			if build != nil {
+				return false
+			}
+		}
+		for _, add := range self.Add {
+			if add != nil {
+				return false
+			}
+		}
+		for _, remove := range self.Remove {
+			if remove != nil {
+				return false
+			}
+		}
+		return true
+	}
 }
 
 func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
@@ -255,6 +281,10 @@ func (self *LeviGroupedTask) NeedToRestartNginx() bool {
 		}
 	}
 	return addCount > 0 || len(lt.Remove) != 0
+}
+
+func (self *LeviGroupedTask) Done() bool {
+	return self.Tasks != nil && self.Tasks.Done()
 }
 
 func AddContainerTask(app *Application, host *Host) *Task {

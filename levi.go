@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -127,66 +128,45 @@ func (self *Levi) Run() {
 
 			taskUUID := taskReply.Id
 
-			if taskUUID == "__STATUS__" || len(taskReply.Status) != 0 {
-				Logger.Info("special commands")
-				UpdateContainerStatus(host, taskReply.Status)
-				continue
-			}
-
-			if taskReply.Test != nil {
-				// 根据保存的container以及关联的任务
-				// 处理测试任务结果
-				Logger.Info("Test result")
-				for containerId, testResult := range taskReply.Test {
-					Logger.Debug("test result ", testResult)
-					Logger.Debug("test container id ", containerId)
-					container := models.GetContainerByCid(containerId)
-					Logger.Debug("test container ", container)
-					if container == nil {
-						continue
-					}
-					st := models.GetStoredTaskByAppAndRet(container.AppId, container.ContainerId)
-					Logger.Debug("test stored task ", st)
-					if st == nil {
-						continue
-					}
-					if testResult.ExitCode == 0 {
-						st.Done(models.SUCC, fmt.Sprintf("%s|%s", container.IdentId, testResult.Err))
-					} else {
-						st.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentId, testResult.Err))
-					}
-					container.Delete()
-				}
-				continue
-			}
-
-			// 普通任务的返回值
 			lgt, exists := self.waiting[taskUUID]
 			if !exists {
-				Logger.Info("not exists, ignore")
+				Logger.Info(taskUUID, " not exists, ignore")
 				continue
 			}
 
 			app := models.GetApplicationByNameAndVersion(lgt.Name, lgt.Version)
 			if app == nil {
-				Logger.Info("app 没了")
+				Logger.Info(fmt.Sprintf("App %v", app), "没了")
 				continue
 			}
 
 			lt := lgt.Tasks
-			doAdd(app, host, lt.Add, taskReply.Add)
-			doBuild(app, host, lt.Build, taskReply.Build)
-			doRemove(lt.Remove, taskReply.Remove)
 
-			if lgt.NeedToRestartNginx() {
-				hub.done <- app.Id
+			switch taskReply.Type {
+			case models.ADD_TASK:
+				doAdd(app, host, lt.Add, taskReply)
+			case models.REMOVE_TASK:
+				doRemove(lt.Remove, taskReply)
+			case models.BUILD_TASK:
+				doBuild(app, lt.Build, taskReply)
+			case models.TEST_TASK:
+				doTest(app, lt.Add, taskReply)
+			case models.INFO_TASK:
+				doStatus(host, taskReply.Data)
 			}
 
-			if len(models.GetContainerByHostAndApp(host, app)) == 0 {
-				hub.immediate <- true
-			}
+			if lgt.Done() {
 
-			delete(self.waiting, taskUUID)
+				if lgt.NeedToRestartNginx() {
+					hub.done <- app.Id
+				}
+
+				if len(models.GetContainerByHostAndApp(host, app)) == 0 {
+					hub.immediate <- true
+				}
+
+				delete(self.waiting, taskUUID)
+			}
 		}
 	}
 }
@@ -199,104 +179,143 @@ func (self *Levi) Len() int {
 	return count
 }
 
-func UpdateContainerStatus(host *models.Host, statuses []*models.StatusInfo) {
-	for _, status := range statuses {
-		if status.Type == "die" {
-			Logger.Info("Should delete ", status.Id, " of ", status.Appname)
-			if c := models.GetContainerByCid(status.Id); c != nil {
-				// 不要发了
-				// hub.Dispatch(host.IP, models.RemoveContainerTask(c))
-			} else {
-				Logger.Info("Container ", status.Id, " already removed")
-			}
+// status没有关联task, 不要担心
+func doStatus(host *models.Host, data string) {
+	r := strings.Split(data, "|")
+	// status|name|containerId
+	if len(r) != 3 {
+		return
+	}
+	status, name, containerId := r[0], r[1], r[2]
+	if status == "die" {
+		Logger.Info("Should delete ", containerId, " of ", name)
+		if c := models.GetContainerByCid(containerId); c != nil {
+			// 不要发了
+			// hub.Dispatch(host.IP, models.RemoveContainerTask(c))
+		} else {
+			Logger.Info("Container ", containerId, " already removed")
 		}
 	}
 }
 
-func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, replies []string) {
-	for i := 0; i < len(tasks); i = i + 1 {
-		task, retval := tasks[i], replies[i]
-
-		Logger.Debug("add tasks[i]: ", task)
-		Logger.Debug("add taskReplies[i]: ", retval)
-
-		if task == nil {
-			Logger.Info("task/retval is nil, ignore")
-			continue
-		}
-		// 其他的add任务来看是不是成功
-		if st := models.GetStoredTaskById(task.Id); st != nil {
+func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, reply models.TaskReply) {
+	task, retval := tasks[reply.Index], reply.Data
+	if task == nil {
+		Logger.Info("task/retval is nil, ignore")
+		return
+	}
+	if st := models.GetStoredTaskById(task.Id); st != nil {
+		switch reply.Done {
+		case true:
 			if !task.IsTest() {
-				// 非测试任务的Add返回值是容器id
-				if retval != "" {
-					st.Done(models.SUCC, retval)
-				} else {
-					st.Done(models.FAIL, retval)
-				}
+				st.Done(models.SUCC, retval)
+				models.NewContainer(app, host, task.Bind, retval, task.Daemon)
+			} else {
+				// 理论上不可能出现任务是测试Type是ADD_TASK同时又是Done为true的
+				st.Done(models.FAIL, retval)
+			}
+			tasks[reply.Index] = nil
+		case false:
+			if !task.IsTest() {
+				Logger.Debug("Add output stream: ", retval)
+				// TODO 记录下AddContainer的日志流返回
 			} else {
 				// 如果测试任务就没返回容器值, 那么直接挂
 				if retval != "" {
 					st.SetResult(retval)
+					models.NewContainer(app, host, task.Bind, retval, task.Test)
 				} else {
 					st.Done(models.FAIL, "failed when create testing container")
 				}
 			}
 		}
-
-		identId := task.Daemon
-		if task.IsTest() {
-			identId = task.Test
-		}
-
-		if retval != "" {
-			models.NewContainer(app, host, task.Bind, retval, identId)
-		}
 	}
+
 }
 
-func doBuild(app *models.Application, host *models.Host, tasks []*models.BuildTask, replies []string) {
-	for i := 0; i < len(tasks); i = i + 1 {
-		task, retval := tasks[i], replies[i]
-
-		Logger.Debug("build tasks[i]: ", task)
-		Logger.Debug("build taskReplies[i]: ", retval)
-
-		if task == nil {
-			Logger.Info("task/retval is nil, ignore")
-			continue
+func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskReply) {
+	task, retval := tasks[reply.Index], reply.Data
+	if task == nil {
+		Logger.Info("task/retval is nil, ignore")
+		return
+	}
+	if st := models.GetStoredTaskById(task.Id); st != nil {
+		switch reply.Done {
+		case false:
+			// TODO 记录下TestContainer的日志流返回
+			Logger.Debug("Test output stream: ", retval)
+		case true:
+			if task.IsTest() {
+				Logger.Info("Test result")
+				containerId := st.Result
+				Logger.Debug("test result ", retval)
+				Logger.Debug("test container id ", containerId)
+				container := models.GetContainerByCid(containerId)
+				Logger.Debug("test container ", container)
+				if container == nil {
+					return
+				}
+				if retval == "0" {
+					st.Done(models.SUCC, fmt.Sprintf("%s|%s", container.IdentId, retval))
+				} else {
+					st.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentId, retval))
+				}
+				container.Delete()
+			}
+			tasks[reply.Index] = nil
 		}
+	}
 
+}
+
+func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.TaskReply) {
+	task, retval := tasks[reply.Index], reply.Data
+
+	Logger.Debug("build tasks[i]: ", task)
+	Logger.Debug("build taskReplies[i]: ", retval)
+
+	if task == nil {
+		Logger.Info("task/retval is nil, ignore")
+		return
+	}
+
+	switch reply.Done {
+	case false:
+		Logger.Debug("Build output stream: ", retval)
+	case true:
 		appUserUid := app.UserUid()
 		staticPath := path.Join(config.Config.Nginx.Staticdir, app.Name, app.Version)
 		staticSrcPath := path.Join(config.Config.Nginx.Staticsrcdir, app.Name, app.Version)
 		if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
 			Logger.Info("copy files error: ", err)
 		}
-		// build 根据返回值来判断是不是成功
 		if st := models.GetStoredTaskById(task.Id); st != nil {
 			if retval != "" {
 				st.Done(models.SUCC, retval)
-				// 返回值是image地址
 				app.SetImageAddr(retval)
 			} else {
 				st.Done(models.FAIL, retval)
 			}
 		}
+		tasks[reply.Index] = nil
 	}
 }
 
-func doRemove(tasks []*models.RemoveTask, replies []bool) {
-	for i := 0; i < len(tasks); i = i + 1 {
-		task, retval := tasks[i], replies[i]
+func doRemove(tasks []*models.RemoveTask, reply models.TaskReply) {
+	task, retval := tasks[reply.Index], reply.Data
 
-		Logger.Debug("remove tasks[i]: ", task)
-		Logger.Debug("remove taskReplies[i]: ", retval)
+	Logger.Debug("remove tasks[i]: ", task)
+	Logger.Debug("remove taskReplies[i]: ", retval)
 
-		if task == nil {
-			Logger.Info("task/retval is nil, ignore")
-			continue
-		}
+	if task == nil {
+		Logger.Info("task/retval is nil, ignore")
+		return
+	}
+	switch reply.Done {
+	case false:
+		Logger.Debug("Remove output stream: ", retval)
 
+	case true:
 		if old := models.GetContainerByCid(task.Container); old != nil {
 			old.Delete()
 		} else {
@@ -304,11 +323,12 @@ func doRemove(tasks []*models.RemoveTask, replies []bool) {
 		}
 		// build 根据返回值来判断是不是成功
 		if st := models.GetStoredTaskById(task.Id); st != nil {
-			if retval {
+			if retval == "1" {
 				st.Done(models.SUCC, "removed")
 			} else {
 				st.Done(models.FAIL, "not removed")
 			}
 		}
+		tasks[reply.Index] = nil
 	}
 }
