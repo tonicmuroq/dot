@@ -128,6 +128,11 @@ func (self *Levi) Run() {
 
 			taskUUID := taskReply.Id
 
+			if taskUUID == "__STATUS__" {
+				doStatus(host, taskReply.Data)
+				continue
+			}
+
 			lgt, exists := self.waiting[taskUUID]
 			if !exists {
 				Logger.Info(taskUUID, " not exists, ignore")
