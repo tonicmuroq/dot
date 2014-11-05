@@ -219,7 +219,7 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 				// 理论上不可能出现任务是测试Type是ADD_TASK同时又是Done为true的
 				st.Done(models.FAIL, retval)
 			}
-			tasks[reply.Index] = nil
+			task.Done()
 		case false:
 			if !task.IsTest() {
 				Logger.Debug("Add output stream: ", retval)
@@ -267,7 +267,7 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 				}
 				container.Delete()
 			}
-			tasks[reply.Index] = nil
+			task.Done()
 		}
 	}
 
@@ -302,7 +302,7 @@ func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.Ta
 				st.Done(models.FAIL, retval)
 			}
 		}
-		tasks[reply.Index] = nil
+		task.Done()
 	}
 }
 
@@ -334,6 +334,6 @@ func doRemove(tasks []*models.RemoveTask, reply models.TaskReply) {
 				st.Done(models.FAIL, "not removed")
 			}
 		}
-		tasks[reply.Index] = nil
+		task.Done()
 	}
 }

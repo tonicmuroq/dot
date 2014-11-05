@@ -39,6 +39,7 @@ type BuildTask struct {
 	Build   string
 	Static  string
 	Schema  string
+	done    bool
 }
 
 type AddTask struct {
@@ -53,6 +54,7 @@ type AddTask struct {
 	CpuSet    string
 	Daemon    string
 	Test      string
+	done      bool
 }
 
 type RemoveTask struct {
@@ -61,6 +63,7 @@ type RemoveTask struct {
 	Version   string
 	Container string
 	RmImage   bool
+	done      bool
 }
 
 type Task struct {
@@ -131,6 +134,18 @@ type StoredTask struct {
 	Finished time.Time `orm:"auto_now;type(datetime)"`
 }
 
+func (self *BuildTask) Done() {
+	self.done = true
+}
+
+func (self *AddTask) Done() {
+	self.done = true
+}
+
+func (self *RemoveTask) Done() {
+	self.done = true
+}
+
 func (self *LeviTasks) Done() bool {
 	sumLength := len(self.Build) + len(self.Add) + len(self.Remove)
 	if sumLength == 0 {
@@ -138,17 +153,17 @@ func (self *LeviTasks) Done() bool {
 		return false
 	} else {
 		for _, build := range self.Build {
-			if build != nil {
+			if build != nil && !build.done {
 				return false
 			}
 		}
 		for _, add := range self.Add {
-			if add != nil {
+			if add != nil && !add.done {
 				return false
 			}
 		}
 		for _, remove := range self.Remove {
-			if remove != nil {
+			if remove != nil && !remove.done {
 				return false
 			}
 		}
@@ -246,6 +261,7 @@ func (self *Task) ToAddTask() *AddTask {
 		CpuSet:    self.CpuSet,
 		Daemon:    self.Daemon,
 		Test:      self.Test,
+		done:      false,
 	}
 }
 
@@ -260,6 +276,7 @@ func (self *Task) ToRemoveTask() *RemoveTask {
 		Version:   self.Version,
 		Container: self.Container,
 		RmImage:   false,
+		done:      false,
 	}
 }
 
@@ -444,6 +461,7 @@ func BuildImageTask(app *Application, base string) *Task {
 		Build:   appYaml.Build[0],
 		Static:  appYaml.Static,
 		Schema:  "", // 先来个空的吧
+		done:    false,
 	}
 	task := Task{
 		Id:      st.Id,
