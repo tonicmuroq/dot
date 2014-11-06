@@ -48,6 +48,7 @@ type Hub struct {
 	immediate     chan bool
 	size          int
 	finished      bool
+	logStreamer   map[int]*Streamer
 }
 
 // Hub methods
@@ -174,6 +175,25 @@ func (self *Hub) Dispatch(host string, task *models.Task) error {
 	return nil
 }
 
+func (self *Hub) Streamer(id int) *Streamer {
+	s, exists := self.logStreamer[id]
+	if !exists {
+		s := NewStreamer(id)
+		go s.Run()
+		self.logStreamer[id] = s
+	}
+	return s
+}
+
+func (self *Hub) RemoveStreamer(id int) {
+	s, exists := self.logStreamer[id]
+	if !exists {
+		return
+	}
+	s.Stop()
+	delete(self.logStreamer, id)
+}
+
 var hub = &Hub{
 	levis:         make(map[string]*Levi),
 	lastCheckTime: make(map[string]time.Time),
@@ -182,6 +202,7 @@ var hub = &Hub{
 	immediate:     make(chan bool),
 	size:          10,
 	finished:      false,
+	logStreamer:   make(map[int]*Streamer),
 }
 
 // Connection methods
@@ -250,4 +271,25 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 	// task := models.HostInfoTask(levi.Host())
 	// hub.Dispatch(ip, task)
 	// levi.immediate <- true
+}
+
+func ServeLogWs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		Logger.Info(err)
+		return
+	}
+	r.ParseForm()
+	taskId := r.Form.Get("task")
+	id, _ := strconv.Atoi(taskId)
+	s, exists := hub.logStreamer[id]
+	if !exists {
+		http.Error(w, "Wrong Task ID", 400)
+		return
+	}
+	s.AddWebsocket(ws)
 }

@@ -20,6 +20,7 @@ func main() {
 
 	http.Handle("/", RestServer)
 	http.HandleFunc("/ws", ServeWs)
+	http.HandleFunc("/wslog", ServeLogWs)
 
 	err := http.ListenAndServe(config.Config.Bind, nil)
 	if err != nil {
