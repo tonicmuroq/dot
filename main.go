@@ -17,10 +17,12 @@ func main() {
 
 	go hub.CheckAlive()
 	go hub.Run()
+	// FIXME 之后要删掉的
+	go streamLogHub.Report()
 
 	http.Handle("/", RestServer)
 	http.HandleFunc("/ws", ServeWs)
-	http.HandleFunc("/wslog", ServeLogWs)
+	http.HandleFunc("/log", ServeLogWs)
 
 	err := http.ListenAndServe(config.Config.Bind, nil)
 	if err != nil {

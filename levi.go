@@ -240,17 +240,17 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 
 func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
+	b := streamLogHub.GetBufferedLog(task.Id, true)
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
 		return
 	}
 	if st := models.GetStoredTaskById(task.Id); st != nil {
+		b.Feed(retval)
 		switch reply.Done {
 		case false:
 			// TODO 记录下TestContainer的日志流返回
 			Logger.Debug("Test output stream: ", retval)
-			s := hub.Streamer(task.Id)
-			s.Feed(retval)
 		case true:
 			if task.IsTest() {
 				container := models.GetContainerByCid(st.Result)
@@ -263,7 +263,7 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 					st.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentId, retval))
 				}
 				container.Delete()
-				hub.RemoveStreamer(task.Id)
+				streamLogHub.RemoveBufferedLog(task.Id)
 			}
 			task.Done()
 		}
@@ -273,6 +273,8 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 
 func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
+	b := streamLogHub.GetBufferedLog(task.Id, true)
+	b.Feed(retval)
 
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
@@ -282,8 +284,6 @@ func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.Ta
 	switch reply.Done {
 	case false:
 		Logger.Debug("Build output stream: ", retval)
-		s := hub.Streamer(task.Id)
-		s.Feed(retval)
 	case true:
 		appUserUid := app.UserUid()
 		staticPath := path.Join(config.Config.Nginx.Staticdir, app.Name, app.Version)
@@ -299,7 +299,7 @@ func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.Ta
 				st.Done(models.FAIL, retval)
 			}
 		}
-		hub.RemoveStreamer(task.Id)
+		streamLogHub.RemoveBufferedLog(task.Id)
 		task.Done()
 	}
 }
