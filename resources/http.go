@@ -8,16 +8,19 @@ import (
 )
 
 func Post(addr string, form url.Values) (map[string]string, error) {
-	if r, err := http.DefaultClient.PostForm(addr, form); err == nil {
-		defer r.Body.Close()
-		if content, err := ioutil.ReadAll(r.Body); err == nil {
-			var data map[string]string
-			json.Unmarshal(content, &data)
-			return data, nil
-		} else {
-			return nil, err
-		}
-	} else {
+	r, err := http.PostForm(addr, form)
+	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
+	content, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	var data map[string]string
+	err := json.Unmarshal(content, &data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }

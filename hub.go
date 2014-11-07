@@ -171,6 +171,9 @@ func (self *Hub) Dispatch(host string, task *models.Task) error {
 		return errors.New(fmt.Sprintf("%s levi not exists", host))
 	}
 	levi.inTask <- task
+	if task != nil && (task.Type == models.TestApplication || task.Type == models.BuildImage) {
+		streamLogHub.GetBufferedLog(task.Id, true)
+	}
 	return nil
 }
 

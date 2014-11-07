@@ -240,11 +240,13 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 
 func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
+	b := streamLogHub.GetBufferedLog(task.Id, true)
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
 		return
 	}
 	if st := models.GetStoredTaskById(task.Id); st != nil {
+		b.Feed(retval)
 		switch reply.Done {
 		case false:
 			// TODO 记录下TestContainer的日志流返回
@@ -261,6 +263,7 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 					st.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentId, retval))
 				}
 				container.Delete()
+				streamLogHub.RemoveBufferedLog(task.Id)
 			}
 			task.Done()
 		}
@@ -270,6 +273,8 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 
 func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
+	b := streamLogHub.GetBufferedLog(task.Id, true)
+	b.Feed(retval)
 
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
@@ -294,6 +299,7 @@ func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.Ta
 				st.Done(models.FAIL, retval)
 			}
 		}
+		streamLogHub.RemoveBufferedLog(task.Id)
 		task.Done()
 	}
 }
@@ -308,7 +314,6 @@ func doRemove(tasks []*models.RemoveTask, reply models.TaskReply) {
 	switch reply.Done {
 	case false:
 		Logger.Debug("Remove output stream: ", retval)
-
 	case true:
 		if old := models.GetContainerByCid(task.Container); old != nil {
 			old.Delete()
