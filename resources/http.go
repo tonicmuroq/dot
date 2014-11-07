@@ -18,7 +18,7 @@ func Post(addr string, form url.Values) (map[string]string, error) {
 		return nil, err
 	}
 	var data map[string]string
-	err := json.Unmarshal(content, &data)
+	err = json.Unmarshal(content, &data)
 	if err != nil {
 		return nil, err
 	}
