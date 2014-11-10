@@ -213,8 +213,12 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 		switch reply.Done {
 		case true:
 			if !task.IsTest() {
-				st.Done(models.SUCC, retval)
-				models.NewContainer(app, host, task.Bind, retval, task.Daemon)
+				if retval != "" {
+					st.Done(models.SUCC, retval)
+					models.NewContainer(app, host, task.Bind, retval, task.Daemon)
+				} else {
+					st.Done(models.FAIL, retval)
+				}
 			} else {
 				// 理论上不可能出现任务是测试Type是ADD_TASK同时又是Done为true的
 				st.Done(models.FAIL, retval)
