@@ -151,24 +151,23 @@ func (self *LeviTasks) Done() bool {
 	if sumLength == 0 {
 		// 本身就是空的
 		return false
-	} else {
-		for _, build := range self.Build {
-			if build != nil && !build.done {
-				return false
-			}
-		}
-		for _, add := range self.Add {
-			if add != nil && !add.done {
-				return false
-			}
-		}
-		for _, remove := range self.Remove {
-			if remove != nil && !remove.done {
-				return false
-			}
-		}
-		return true
 	}
+	for _, build := range self.Build {
+		if build != nil && !build.done {
+			return false
+		}
+	}
+	for _, add := range self.Add {
+		if add != nil && !add.done {
+			return false
+		}
+	}
+	for _, remove := range self.Remove {
+		if remove != nil && !remove.done {
+			return false
+		}
+	}
+	return true
 }
 
 func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
