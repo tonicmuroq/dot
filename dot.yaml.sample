@@ -1,12 +1,14 @@
 bind: "localhost:5000"
 pidfile: "/var/run/dot.pid"
-masteraddr: "10.1.201.99"
-minport: 49000
-maxport: 49999
 db:
     name: "default"
     use: "mysql"
     url: "root:@/dot?charset=utf8"
+dbmgr:
+    name: "mgr"
+    use: "mysql"
+    url: "root:@/dot?charset=utf8"
+redismgr: "http://10.1.201.47"
 etcd:
     sync: true
     machines:
@@ -20,8 +22,6 @@ task:
     dispatch: 5
     queuesize: 10
     restartsize: 5
-    cpushare: 100
-    cpuset: ""
 nginx:
     template: "templates/nginx.tmpl"
     conf: ""
@@ -31,5 +31,5 @@ nginx:
 dba:
     sysuid: "CreateDbUser"
     syspwd: "CreateDbUser"
-    bcode: "codetest"
-    addr: "http://192.168.8.213:8088/createdatabase.aspx"
+    bcode: "AutoUpdate"
+    addr: "http://192.168.8.213:8088/CreateDatabase.aspx"
