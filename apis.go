@@ -5,7 +5,6 @@ import (
 	"./resources"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/bmizerany/pat"
@@ -13,13 +12,25 @@ import (
 
 var RestServer *pat.PatternServeMux
 
-type JsonTmpl map[string]interface{}
+type JSON map[string]interface{}
 
-func HelloServer(w http.ResponseWriter, req *http.Request) {
-	io.WriteString(w, "hello, ["+req.URL.Query().Get(":name")+"]")
+var (
+	NoSuchApp       = JSON{"r": 1, "msg": "no such app"}
+	NoSuchHost      = JSON{"r": 1, "msg": "no such host"}
+	NoSuchContainer = JSON{"r": 1, "msg": "no such container"}
+)
+
+func JSONWrapper(f func(*http.Request) JSON) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		json.NewEncoder(w).Encode(f(req))
+	}
 }
 
-func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
+func EchoHandler(req *http.Request) JSON {
+	return JSON{"r": 0, "msg": "ok"}
+}
+
+func RegisterApplicationHandler(req *http.Request) JSON {
 	req.ParseForm()
 	projectname := req.URL.Query().Get(":projectname")
 	version := req.URL.Query().Get(":version")
@@ -27,16 +38,14 @@ func RegisterApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	appyaml := req.Form.Get("appyaml")
 	configyaml := req.Form.Get("configyaml")
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
-	if app := models.NewApplication(projectname, version, group, appyaml, configyaml); app == nil {
-		r["r"] = 1
-		r["msg"] = "error"
+	app := models.NewApplication(projectname, version, group, appyaml, configyaml)
+	if app == nil {
+		return JSON{"r": 1, "msg": "register app fail"}
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	return JSON{"r": 0, "msg": "ok"}
 }
 
-func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
+func AddContainerHandler(req *http.Request) JSON {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
@@ -45,132 +54,101 @@ func AddContainerHandler(w http.ResponseWriter, req *http.Request) {
 	app := models.GetApplicationByNameAndVersion(name, version)
 	host := models.GetHostByIP(ip)
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
 	if app == nil || host == nil {
-		r["r"] = 1
-		r["msg"] = "no such app"
-	} else if appyaml, err := app.GetAppYaml(); err != nil || (appyaml.Port == 0 && !appyaml.Daemon) {
-		r["r"] = 1
-		r["msg"] = "app port is 0 or no daemon"
-	} else {
-		task := models.AddContainerTask(app, host)
-		if err := hub.Dispatch(host.IP, task); err != nil {
-			r["r"] = 1
-			r["msg"] = err.Error()
-		} else {
-			r["task_id"] = task.Id
-		}
+		return NoSuchApp
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	if appyaml, err := app.GetAppYaml(); err != nil || (appyaml.Port == 0 && !appyaml.Daemon) {
+		return JSON{"r": 1, "msg": "app port is 0 or no daemon"}
+	}
+	task := models.AddContainerTask(app, host)
+	err := hub.Dispatch(host.IP, task)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
 }
 
-func BuildImageHandler(w http.ResponseWriter, req *http.Request) {
+func BuildImageHandler(req *http.Request) JSON {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	// 暂时没有monitor, 那么人肉指定host吧
 	ip := req.Form.Get("host")
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
 	app := models.GetApplicationByNameAndVersion(name, version)
 	host := models.GetHostByIP(ip)
 	if app == nil || host == nil {
-		r["r"] = 1
-		r["msg"] = "no such app"
-	} else {
-		base := req.Form.Get("base")
-		task := models.BuildImageTask(app, base)
-		if err := hub.Dispatch(host.IP, task); err != nil {
-			r["r"] = 1
-			r["msg"] = err.Error()
-		} else {
-			r["task_id"] = task.Id
-		}
+		return NoSuchApp
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	base := req.Form.Get("base")
+	task := models.BuildImageTask(app, base)
+	err := hub.Dispatch(host.IP, task)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
 }
 
-func TestImageHandler(w http.ResponseWriter, req *http.Request) {
+func TestImageHandler(req *http.Request) JSON {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	// 暂时没有monitor, 那么人肉指定host吧
 	ip := req.Form.Get("host")
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
 	app := models.GetApplicationByNameAndVersion(name, version)
 	host := models.GetHostByIP(ip)
 	if app == nil || host == nil {
-		r["r"] = 1
-		r["msg"] = "no such app"
-	} else {
-		task := models.TestApplicationTask(app, host)
-		if err := hub.Dispatch(host.IP, task); err != nil {
-			r["r"] = 1
-			r["msg"] = err.Error()
-		} else {
-			r["task_id"] = task.Id
-		}
+		return NoSuchApp
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	task := models.TestApplicationTask(app, host)
+	err := hub.Dispatch(host.IP, task)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
 }
 
-func DeployApplicationHandler(w http.ResponseWriter, req *http.Request) {
+func DeployApplicationHandler(req *http.Request) JSON {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ips := req.Form["hosts"]
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
 	app := models.GetApplicationByNameAndVersion(name, version)
 	hosts := models.GetHostsByIPs(ips)
 	if app == nil {
-		r["r"] = 1
-		r["msg"] = "no such app"
-	} else if appyaml, err := app.GetAppYaml(); err != nil || (appyaml.Port == 0 && !appyaml.Daemon) {
-		r["r"] = 1
-		r["msg"] = "app port is 0 or no daemon"
-	} else {
-		if taskIds, err := DeployApplicationHelper(app, hosts); err != nil {
-			r["r"] = 1
-			r["msg"] = err.Error()
-		} else {
-			r["task_ids"] = taskIds
-		}
+		return NoSuchApp
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	if appyaml, err := app.GetAppYaml(); err != nil || (appyaml.Port == 0 && !appyaml.Daemon) {
+		return JSON{"r": 1, "msg": "app port is 0 or no daemon"}
+	}
+	taskIds, err := DeployApplicationHelper(app, hosts)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok", "task_ids": taskIds}
 }
 
-func RemoveApplicationHandler(w http.ResponseWriter, req *http.Request) {
+func RemoveApplicationHandler(req *http.Request) JSON {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
 	app := models.GetApplicationByNameAndVersion(name, version)
 	host := models.GetHostByIP(ip)
 	if app == nil || host == nil {
-		r["r"] = 1
-		r["msg"] = "no such app"
-	} else {
-		if taskIds, err := RemoveApplicationFromHostHelper(app, host); err != nil {
-			r["r"] = 1
-			r["msg"] = err.Error()
-		} else {
-			r["task_ids"] = taskIds
-		}
+		return NoSuchApp
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	taskIds, err := RemoveApplicationFromHostHelper(app, host)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok", "task_ids": taskIds}
 }
 
-func UpdateApplicationHandler(w http.ResponseWriter, req *http.Request) {
-
+func UpdateApplicationHandler(req *http.Request) JSON {
 	req.ParseForm()
 
 	name := req.URL.Query().Get(":app")
@@ -179,102 +157,120 @@ func UpdateApplicationHandler(w http.ResponseWriter, req *http.Request) {
 	ips := req.Form["hosts"]
 	toVersion := req.Form.Get("to")
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
 	fromApp := models.GetApplicationByNameAndVersion(name, fromVersion)
 	toApp := models.GetApplicationByNameAndVersion(name, toVersion)
 	hosts := models.GetHostsByIPs(ips)
 	if fromApp == nil || toApp == nil {
-		r["r"] = 1
-		r["msg"] = fmt.Sprintf("no such app %v, %v", fromApp, toApp)
-	} else {
-		if taskIds, err := UpdateApplicationHelper(fromApp, toApp, hosts); err != nil {
-			r["r"] = 1
-			r["msg"] = err.Error()
-		} else {
-			r["task_ids"] = taskIds
-		}
+		return JSON{"r": 1, "msg": fmt.Sprintf("no such app %v, %v", fromApp, toApp)}
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	taskIds, err := UpdateApplicationHelper(fromApp, toApp, hosts)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok", "task_ids": taskIds}
 }
 
-func RemoveContainerHandler(w http.ResponseWriter, req *http.Request) {
+func RemoveContainerHandler(req *http.Request) JSON {
 	req.ParseForm()
 	cid := req.URL.Query().Get(":cid")
 
-	r := JsonTmpl{"r": 0, "msg": "ok"}
 	container := models.GetContainerByCid(cid)
 	if container == nil {
-		r["r"] = 1
-		r["msg"] = "no such container"
-	} else {
-		host := container.Host()
-		task := models.RemoveContainerTask(container)
-		if err := hub.Dispatch(host.IP, task); err != nil {
-			r["r"] = 1
-			r["msg"] = err.Error()
-		} else {
-			r["task_id"] = task.Id
-		}
+		return NoSuchContainer
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	host := container.Host()
+	task := models.RemoveContainerTask(container)
+	err := hub.Dispatch(host.IP, task)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
 }
 
-func NewMySQLInstanceHandler(w http.ResponseWriter, req *http.Request) {
+func NewMySQLInstanceHandler(req *http.Request) JSON {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 
-	r := JsonTmpl{"r": 1, "msg": "", "mysql": nil}
-	if app := models.GetApplicationByNameAndVersion(name, version); app != nil {
-		if mysql, err := resources.NewMySQLInstance(app.Name); err == nil {
-			r["r"] = 0
-			r["mysql"] = mysql
-		} else {
-			r["msg"] = err.Error()
-		}
-	} else {
-		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
+	app := models.GetApplicationByNameAndVersion(name, version)
+	if app == nil {
+		return NoSuchApp
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	mysql, err := resources.NewMySQLInstance(app.Name)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
+	}
+	return JSON{"r": 0, "msg": "", "mysql": mysql}
 }
 
-func NewRedisInstanceHandler(w http.ResponseWriter, req *http.Request) {
+func NewRedisInstanceHandler(req *http.Request) JSON {
 	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 
-	r := JsonTmpl{"r": 1, "msg": "", "redis": nil}
-	if app := models.GetApplicationByNameAndVersion(name, version); app != nil {
-		if redis, err := resources.NewRedisInstance(app.Name); err == nil {
-			r["r"] = 0
-			r["redis"] = redis
-		} else {
-			r["msg"] = err.Error()
-		}
-	} else {
-		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
+	app := models.GetApplicationByNameAndVersion(name, version)
+	if app == nil {
+		return NoSuchApp
 	}
-	encoder := json.NewEncoder(w)
-	encoder.Encode(r)
+	redis, err := resources.NewRedisInstance(app.Name)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
+	}
+	return JSON{"r": 0, "msg": "", "redis": redis}
+}
+
+func SyncDBHandler(req *http.Request) JSON {
+	req.ParseForm()
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+	schema := req.Form.Get("schema")
+
+	r := JSON{"r": 1, "msg": ""}
+	app := models.GetApplicationByNameAndVersion(name, version)
+	if app == nil {
+		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
+		return r
+	}
+	dsn := app.MySQLDSN()
+	if dsn == "" {
+		r["msg"] = fmt.Sprintf("app %s, %s has no dsn", name, version)
+		return r
+	}
+	err := resources.SyncSchema(app.MySQLDSN(), schema)
+	if err != nil {
+		r["msg"] = err.Error()
+		return r
+	}
+	r["r"] = 0
+	return r
 }
 
 func init() {
 	RestServer = pat.New()
-	RestServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
 
-	RestServer.Post("/app/:projectname/:version", http.HandlerFunc(RegisterApplicationHandler))
-	RestServer.Post("/app/:app/:version/add", http.HandlerFunc(AddContainerHandler))
-	RestServer.Post("/app/:app/:version/build", http.HandlerFunc(BuildImageHandler))
-	RestServer.Post("/app/:app/:version/test", http.HandlerFunc(TestImageHandler))
-	RestServer.Post("/app/:app/:version/deploy", http.HandlerFunc(DeployApplicationHandler))
-	RestServer.Post("/app/:app/:version/update", http.HandlerFunc(UpdateApplicationHandler))
-	RestServer.Post("/app/:app/:version/remove", http.HandlerFunc(RemoveApplicationHandler))
+	rs := map[string]map[string]func(*http.Request) JSON{
+		"POST": {
+			"/app/:projectname/:version":     RegisterApplicationHandler,
+			"/app/:app/:version/add":         AddContainerHandler,
+			"/app/:app/:version/build":       BuildImageHandler,
+			"/app/:app/:version/test":        TestImageHandler,
+			"/app/:app/:version/deploy":      DeployApplicationHandler,
+			"/app/:app/:version/update":      UpdateApplicationHandler,
+			"/app/:app/:version/remove":      RemoveApplicationHandler,
+			"/container/:cid/remove":         RemoveContainerHandler,
+			"/resource/:app/:version/mysql":  NewMySQLInstanceHandler,
+			"/resource/:app/:version/syncdb": SyncDBHandler,
+			"/resource/:app/:version/redis":  NewRedisInstanceHandler,
+		},
+		"GET": {
+			"/echo": EchoHandler,
+		},
+	}
 
-	RestServer.Post("/container/:cid/remove", http.HandlerFunc(RemoveContainerHandler))
+	for method, routes := range rs {
+		for route, handler := range routes {
+			RestServer.Add(method, route, http.HandlerFunc(JSONWrapper(handler)))
+		}
+	}
 
-	RestServer.Post("/resource/:app/:version/mysql", http.HandlerFunc(NewMySQLInstanceHandler))
-	RestServer.Post("/resource/:app/:version/redis", http.HandlerFunc(NewRedisInstanceHandler))
 }

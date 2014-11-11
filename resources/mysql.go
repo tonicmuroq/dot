@@ -3,6 +3,7 @@ package resources
 import (
 	"../config"
 	"../utils"
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/astaxie/beego/orm"
@@ -41,6 +42,19 @@ func NewMySQLInstance(appname string) (map[string]interface{}, error) {
 		"db":       appname,
 		"port":     3306,
 	}, nil
+}
+
+func SyncSchema(dsn, schema string) error {
+	conn, err := sql.Open("mysql", dsn)
+	defer conn.Close()
+	if err != nil {
+		return err
+	}
+	_, err = conn.Exec(schema)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func NewMySQLInstance2(appname string) (map[string]interface{}, error) {
