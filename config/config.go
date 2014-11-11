@@ -47,10 +47,12 @@ type DotConfig struct {
 	Bind       string
 	Pidfile    string
 	Masteraddr string
+	Redismgr   string
 	Minport    int
 	Maxport    int
 
 	Db    DbConfig
+	Dbmgr DbConfig
 	Etcd  EtcdConfig
 	Task  TaskConfig
 	Nginx NginxConfig

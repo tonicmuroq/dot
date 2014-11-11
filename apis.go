@@ -241,6 +241,26 @@ func NewMySQLInstanceHandler(w http.ResponseWriter, req *http.Request) {
 	encoder.Encode(r)
 }
 
+func NewRedisInstanceHandler(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+
+	r := JsonTmpl{"r": 1, "msg": "", "redis": nil}
+	if app := models.GetApplicationByNameAndVersion(name, version); app != nil {
+		if redis, err := resources.NewRedisInstance(app.Name); err == nil {
+			r["r"] = 0
+			r["redis"] = redis
+		} else {
+			r["msg"] = err.Error()
+		}
+	} else {
+		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
+	}
+	encoder := json.NewEncoder(w)
+	encoder.Encode(r)
+}
+
 func init() {
 	RestServer = pat.New()
 	RestServer.Get("/hello/:name", http.HandlerFunc(HelloServer))
@@ -256,4 +276,5 @@ func init() {
 	RestServer.Post("/container/:cid/remove", http.HandlerFunc(RemoveContainerHandler))
 
 	RestServer.Post("/resource/:app/:version/mysql", http.HandlerFunc(NewMySQLInstanceHandler))
+	RestServer.Post("/resource/:app/:version/redis", http.HandlerFunc(NewRedisInstanceHandler))
 }
