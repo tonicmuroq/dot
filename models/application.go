@@ -202,11 +202,23 @@ func (self *Application) AllVersionHosts() []*Host {
 
 func (self *Application) GetDBInfo(kind string) map[string]interface{} {
 	cpath := path.Join(AppPathPrefix, self.Name, kind)
-	if r, err := etcdClient.Get(cpath, false, false); err == nil {
-		var d map[string]interface{}
-		JSONDecode(r.Node.Value, &d)
-		return d
-	} else {
+	r, err := etcdClient.Get(cpath, false, false)
+	if err != nil {
 		return nil
 	}
+	if r.Node.Dir {
+		return nil
+	}
+	var d map[string]interface{}
+	JSONDecode(r.Node.Value, &d)
+	return d
+}
+
+func (self *Application) MySQLDSN() string {
+	mysql := self.GetDBInfo("mysql")
+	if mysql == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
+		mysql["username"], mysql["password"], mysql["host"], mysql["port"], mysql["db"])
 }
