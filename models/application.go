@@ -11,8 +11,9 @@ import (
 	"time"
 )
 
-const (
-	appPathPrefix = "/NBE/"
+var (
+	AppPathPrefix  = "/NBE/"
+	ShouldNotBeDIR = errors.New("should not be dir")
 )
 
 type Application struct {
@@ -139,7 +140,7 @@ func (self *Application) CreateDNS() error {
 }
 
 func (self *Application) GetYamlPath(cpath string) string {
-	return path.Join(appPathPrefix, self.Name, self.Version, fmt.Sprintf("%s.yaml", cpath))
+	return path.Join(AppPathPrefix, self.Name, self.Version, fmt.Sprintf("%s.yaml", cpath))
 }
 
 func (self *Application) GetAppYaml() (*AppYaml, error) {
@@ -147,13 +148,13 @@ func (self *Application) GetAppYaml() (*AppYaml, error) {
 	cpath := self.GetYamlPath("app")
 	r, err := etcdClient.Get(cpath, false, false)
 	if err != nil {
-		return &appYaml, err
+		return nil, err
 	}
 	if r.Node.Dir {
-		return &appYaml, errors.New("should not be dir")
+		return nil, ShouldNotBeDIR
 	}
-	if err = YAMLDecode(r.Node.Value, &appYaml); err != nil {
-		return &appYaml, err
+	if err := YAMLDecode(r.Node.Value, &appYaml); err != nil {
+		return nil, err
 	}
 	return &appYaml, nil
 }
@@ -163,13 +164,13 @@ func (self *Application) GetConfigYaml() (*ConfigYaml, error) {
 	cpath := self.GetYamlPath("config")
 	r, err := etcdClient.Get(cpath, false, false)
 	if err != nil {
-		return &configYaml, err
+		return nil, err
 	}
 	if r.Node.Dir {
-		return &configYaml, errors.New("should not be dir")
+		return nil, ShouldNotBeDIR
 	}
-	if err = YAMLDecode(r.Node.Value, &configYaml); err != nil {
-		return &configYaml, err
+	if err := YAMLDecode(r.Node.Value, &configYaml); err != nil {
+		return nil, err
 	}
 	return &configYaml, nil
 }
@@ -200,7 +201,7 @@ func (self *Application) AllVersionHosts() []*Host {
 }
 
 func (self *Application) GetDBInfo(kind string) map[string]interface{} {
-	cpath := path.Join(appPathPrefix, self.Name, kind)
+	cpath := path.Join(AppPathPrefix, self.Name, kind)
 	if r, err := etcdClient.Get(cpath, false, false); err == nil {
 		var d map[string]interface{}
 		JSONDecode(r.Node.Value, &d)
