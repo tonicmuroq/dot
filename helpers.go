@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-func DeployApplicationHelper(app *models.Application, hosts []*models.Host) ([]int, error) {
+func DeployApplicationHelper(app *models.Application, hosts []*models.Host, daemon bool) ([]int, error) {
 	var err error
 	taskIds := []int{}
 	for _, host := range hosts {
@@ -14,7 +14,7 @@ func DeployApplicationHelper(app *models.Application, hosts []*models.Host) ([]i
 		}
 		cs := models.GetContainerByHostAndApp(host, app)
 		if len(cs) == 0 {
-			task := models.AddContainerTask(app, host)
+			task := models.AddContainerTask(app, host, daemon)
 			if task != nil {
 				taskIds = append(taskIds, task.Id)
 				err = hub.Dispatch(host.IP, task)

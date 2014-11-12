@@ -50,6 +50,7 @@ func AddContainerHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
+	daemon := req.Form.Get("daemon")
 
 	app := models.GetApplicationByNameAndVersion(name, version)
 	host := models.GetHostByIP(ip)
@@ -57,10 +58,10 @@ func AddContainerHandler(req *http.Request) JSON {
 	if app == nil || host == nil {
 		return NoSuchApp
 	}
-	if appyaml, err := app.GetAppYaml(); err != nil || (appyaml.Port == 0 && !appyaml.Daemon) {
-		return JSON{"r": 1, "msg": "app port is 0 or no daemon"}
+	if appyaml, err := app.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
+		return JSON{"r": 1, "msg": "daemon set true but no daemon defined"}
 	}
-	task := models.AddContainerTask(app, host)
+	task := models.AddContainerTask(app, host, daemon == "true")
 	err := hub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
@@ -114,16 +115,17 @@ func DeployApplicationHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ips := req.Form["hosts"]
+	daemon := req.Form.Get("daemon")
 
 	app := models.GetApplicationByNameAndVersion(name, version)
 	hosts := models.GetHostsByIPs(ips)
 	if app == nil {
 		return NoSuchApp
 	}
-	if appyaml, err := app.GetAppYaml(); err != nil || (appyaml.Port == 0 && !appyaml.Daemon) {
-		return JSON{"r": 1, "msg": "app port is 0 or no daemon"}
+	if appyaml, err := app.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
+		return JSON{"r": 1, "msg": "no daemon defined"}
 	}
-	taskIds, err := DeployApplicationHelper(app, hosts)
+	taskIds, err := DeployApplicationHelper(app, hosts, daemon == "true")
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}

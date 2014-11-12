@@ -32,11 +32,11 @@ type AppYaml struct {
 	Runtime  string   `json:runtime`
 	Port     int      `json:port`
 	Cmd      []string `json:cmd`
+	Daemon   []string `json:daemon`
 	Test     []string `json:test`
 	Build    []string `json:build`
 	Services []string `json:services`
 	Static   string   `json:static`
-	Daemon   bool     `json:daemon`
 	Schema   string   `json:schema`
 }
 

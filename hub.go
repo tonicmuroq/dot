@@ -249,9 +249,4 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	go levi.Run()
 	go levi.WaitTask()
-
-	// FIX(tonic): 暂时不发info任务
-	// task := models.HostInfoTask(levi.Host())
-	// hub.Dispatch(ip, task)
-	// levi.immediate <- true
 }
