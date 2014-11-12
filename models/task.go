@@ -303,32 +303,37 @@ func (self *LeviGroupedTask) Done() bool {
 	return self.Tasks != nil && self.Tasks.Done()
 }
 
-func AddContainerTask(app *Application, host *Host) *Task {
-
+func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 	appYaml, err := app.GetAppYaml()
 	if err != nil {
 		Logger.Debug("app.yaml error: ", err)
 		return nil
 	}
+	if len(appYaml.Daemon) == 0 && daemon {
+		Logger.Debug("no daemon defined in app.yaml")
+		return nil
+	}
+	if len(appYaml.Cmd) == 0 && !daemon {
+		Logger.Debug("no cmd defined in app.yaml")
+		return nil
+	}
 
-	var bind int
-	var daemonId string
+	bind := 0
+	daemonId := ""
+	cmd := []string{}
 
-	if appYaml.Daemon {
+	if daemon {
 		bind = 0
 		daemonId = CreateRandomHexString(app.Name, 7)
+		cmd = strings.Split(appYaml.Daemon[0], " ")
 	} else {
 		bind = GetPortFromHost(host)
-		daemonId = ""
-		// 没有可以用的端口了
 		if bind == 0 {
 			return nil
 		}
+		daemonId = ""
+		cmd = strings.Split(appYaml.Cmd[0], " ")
 	}
-
-	cmdString := appYaml.Cmd[0]
-	cmd := strings.Split(cmdString, " ")
-	port := appYaml.Port
 
 	st := NewStoredTask(app.Id, AddContainer)
 	if st == nil {
@@ -336,11 +341,11 @@ func AddContainerTask(app *Application, host *Host) *Task {
 		return nil
 	}
 
-	task := Task{
+	return &Task{
 		Id:       st.Id,
 		Name:     strings.ToLower(app.Name),
 		Version:  app.Version,
-		Port:     port,
+		Port:     appYaml.Port,
 		Cmd:      cmd,
 		Host:     host.IP,
 		Type:     AddContainer,
@@ -349,8 +354,8 @@ func AddContainerTask(app *Application, host *Host) *Task {
 		Memory:   config.Config.Task.Memory,
 		CpuShare: config.Config.Task.CpuShare,
 		CpuSet:   config.Config.Task.CpuSet,
-		Daemon:   daemonId}
-	return &task
+		Daemon:   daemonId,
+	}
 }
 
 func RemoveContainerTask(container *Container) *Task {
@@ -366,15 +371,15 @@ func RemoveContainerTask(container *Container) *Task {
 		return nil
 	}
 
-	task := Task{
+	return &Task{
 		Id:        st.Id,
 		Name:      strings.ToLower(app.Name),
 		Version:   app.Version,
 		Host:      host.IP,
 		Type:      RemoveContainer,
 		Uid:       0,
-		Container: container.ContainerId}
-	return &task
+		Container: container.ContainerId,
+	}
 }
 
 func UpdateContainerTask(container *Container, app *Application) *Task {
@@ -382,28 +387,27 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 	if host == nil {
 		return nil
 	}
-
-	var bind int
-	var daemonId string
-	if container.IdentId != "" {
-		bind = 0
-		daemonId = CreateRandomHexString(app.Name, 7)
-	} else {
-		bind = GetPortFromHost(host)
-		// 不够端口玩了
-		if bind == 0 {
-			return nil
-		}
-		daemonId = ""
-	}
-
 	appYaml, err := app.GetAppYaml()
 	if err != nil {
 		return nil
 	}
-	cmdString := appYaml.Cmd[0]
-	cmd := strings.Split(cmdString, " ")
-	port := appYaml.Port
+
+	bind := 0
+	daemonId := ""
+	cmd := []string{}
+
+	if container.IdentId != "" {
+		bind = 0
+		daemonId = CreateRandomHexString(app.Name, 7)
+		cmd = strings.Split(appYaml.Daemon[0], " ")
+	} else {
+		bind = GetPortFromHost(host)
+		if bind == 0 {
+			return nil
+		}
+		daemonId = ""
+		cmd = strings.Split(appYaml.Cmd[0], " ")
+	}
 
 	st := NewStoredTask(app.Id, UpdateContainer)
 	if st == nil {
@@ -411,11 +415,11 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		return nil
 	}
 
-	task := Task{
+	return &Task{
 		Id:        st.Id,
 		Name:      strings.ToLower(app.Name),
 		Version:   app.Version,
-		Port:      port,
+		Port:      appYaml.Port,
 		Cmd:       cmd,
 		Host:      host.IP,
 		Type:      UpdateContainer,
@@ -425,8 +429,8 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		CpuShare:  config.Config.Task.CpuShare,
 		CpuSet:    config.Config.Task.CpuSet,
 		Daemon:    daemonId,
-		Container: container.ContainerId}
-	return &task
+		Container: container.ContainerId,
+	}
 }
 
 // build任务的name就是应用的projectname
@@ -462,7 +466,7 @@ func BuildImageTask(app *Application, base string) *Task {
 		Schema:  "", // 先来个空的吧
 		done:    false,
 	}
-	task := Task{
+	return &Task{
 		Id:      st.Id,
 		Name:    strings.ToLower(app.Name),
 		Uid:     app.UserUid(),
@@ -470,12 +474,10 @@ func BuildImageTask(app *Application, base string) *Task {
 		Build:   buildTask,
 		Version: app.Version,
 	}
-	return &task
 }
 
 // test task
 func TestApplicationTask(app *Application, host *Host) *Task {
-	var bind int
 	testId := CreateRandomHexString(app.Name, 7)
 
 	appYaml, err := app.GetAppYaml()
@@ -487,42 +489,25 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 		Logger.Debug("test task error: need test in app.yaml")
 		return nil
 	}
-	testCmdString := appYaml.Test[0]
-	testCmd := strings.Split(testCmdString, " ")
-	port := appYaml.Port
+	testCmd := strings.Split(appYaml.Test[0], " ")
 
 	st := NewStoredTask(app.Id, TestApplication)
 	if st == nil {
 		Logger.Info("task not inserted")
 		return nil
 	}
-	task := Task{
+	return &Task{
 		Id:       st.Id,
 		Name:     strings.ToLower(app.Name),
 		Version:  app.Version,
-		Port:     port,
+		Port:     appYaml.Port,
 		Cmd:      testCmd,
 		Host:     host.IP,
 		Type:     TestApplication,
 		Uid:      app.UserUid(),
-		Bind:     bind,
+		Bind:     0,
 		Memory:   config.Config.Task.Memory,
 		CpuShare: config.Config.Task.CpuShare,
 		CpuSet:   config.Config.Task.CpuSet,
 		Test:     testId}
-	return &task
-}
-
-// host info task
-func HostInfoTask(host *Host) *Task {
-	if host == nil {
-		return nil
-	}
-	return &Task{
-		Name:    "__host_info__",
-		Version: "__info_version__",
-		Host:    host.IP,
-		Type:    HostInfo,
-		Uid:     0,
-	}
 }
