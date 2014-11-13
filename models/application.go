@@ -99,6 +99,8 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 		}
 	}
 
+	testJSON := configYamlJson
+
 	// 注册过程如果已经有了mysql/redis那么复制过去
 	if mysql := app.GetDBInfo("mysql"); mysql != nil {
 		configYamlJson["mysql"] = mysql
@@ -107,8 +109,18 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 		configYamlJson["redis"] = redis
 	}
 
+	if mysql := app.GetDBInfo("test-mysql"); mysql != nil {
+		testJSON["mysql"] = mysql
+	}
+	if redis := app.GetDBInfo("test-redis"); redis != nil {
+		testJSON["redis"] = redis
+	}
+
 	if configYaml, err := YAMLEncode(configYamlJson); err == nil {
 		etcdClient.Create((&app).GetYamlPath("config"), configYaml, 0)
+	}
+	if testYaml, err := YAMLEncode(testJSON); err == nil {
+		etcdClient.Create((&app).GetYamlPath("test"), testYaml, 0)
 	}
 	if appYaml, err := YAMLEncode(appYamlJson); err == nil {
 		etcdClient.Create((&app).GetYamlPath("app"), appYaml, 0)
