@@ -22,16 +22,17 @@ var (
 
 func JSONWrapper(f func(*http.Request) JSON) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
+		req.ParseForm()
 		json.NewEncoder(w).Encode(f(req))
 	}
 }
 
 func EchoHandler(req *http.Request) JSON {
-	return JSON{"r": 0, "msg": "ok"}
+	msg := req.Form.Get("msg")
+	return JSON{"r": 0, "msg": msg}
 }
 
 func RegisterApplicationHandler(req *http.Request) JSON {
-	req.ParseForm()
 	projectname := req.URL.Query().Get(":projectname")
 	version := req.URL.Query().Get(":version")
 	group := req.Form.Get("group")
@@ -46,7 +47,6 @@ func RegisterApplicationHandler(req *http.Request) JSON {
 }
 
 func AddContainerHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
@@ -70,7 +70,6 @@ func AddContainerHandler(req *http.Request) JSON {
 }
 
 func BuildImageHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	// 暂时没有monitor, 那么人肉指定host吧
@@ -91,7 +90,6 @@ func BuildImageHandler(req *http.Request) JSON {
 }
 
 func TestImageHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	// 暂时没有monitor, 那么人肉指定host吧
@@ -111,7 +109,6 @@ func TestImageHandler(req *http.Request) JSON {
 }
 
 func DeployApplicationHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ips := req.Form["hosts"]
@@ -133,7 +130,6 @@ func DeployApplicationHandler(req *http.Request) JSON {
 }
 
 func RemoveApplicationHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
@@ -151,8 +147,6 @@ func RemoveApplicationHandler(req *http.Request) JSON {
 }
 
 func UpdateApplicationHandler(req *http.Request) JSON {
-	req.ParseForm()
-
 	name := req.URL.Query().Get(":app")
 	fromVersion := req.URL.Query().Get(":version")
 
@@ -173,7 +167,6 @@ func UpdateApplicationHandler(req *http.Request) JSON {
 }
 
 func RemoveContainerHandler(req *http.Request) JSON {
-	req.ParseForm()
 	cid := req.URL.Query().Get(":cid")
 
 	container := models.GetContainerByCid(cid)
@@ -190,7 +183,6 @@ func RemoveContainerHandler(req *http.Request) JSON {
 }
 
 func NewMySQLInstanceHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 
@@ -206,7 +198,6 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 }
 
 func NewRedisInstanceHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 
@@ -222,7 +213,6 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 }
 
 func SyncDBHandler(req *http.Request) JSON {
-	req.ParseForm()
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	schema := req.Form.Get("schema")
@@ -247,6 +237,26 @@ func SyncDBHandler(req *http.Request) JSON {
 	return r
 }
 
+func AppBranchHandler(req *http.Request) JSON {
+	name := req.URL.Query().Get(":name")
+	if req.Method == "PUT" {
+		branch := req.Form.Get("branch")
+		err := models.SetHookBranch(name, branch)
+		if err != nil {
+			return JSON{"r": 1, "msg": err.Error()}
+		}
+		return JSON{"r": 0, "msg": "ok"}
+	}
+	if req.Method == "GET" {
+		branch, err := models.GetHookBranch(name)
+		if err != nil {
+			return JSON{"r": 1, "msg": err.Error(), "branch": ""}
+		}
+		return JSON{"r": 0, "msg": "", "branch": branch}
+	}
+	return JSON{"r": 1, "msg": "method not allowed"}
+}
+
 func init() {
 	RestServer = pat.New()
 
@@ -265,7 +275,11 @@ func init() {
 			"/resource/:app/:version/redis":  NewRedisInstanceHandler,
 		},
 		"GET": {
-			"/echo": EchoHandler,
+			"/echo":            EchoHandler,
+			"/app/:app/branch": AppBranchHandler,
+		},
+		"PUT": {
+			"/app/:app/branch": AppBranchHandler,
 		},
 	}
 
@@ -274,5 +288,4 @@ func init() {
 			RestServer.Add(method, route, http.HandlerFunc(JSONWrapper(handler)))
 		}
 	}
-
 }

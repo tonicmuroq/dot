@@ -222,3 +222,24 @@ func (self *Application) MySQLDSN() string {
 	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
 		mysql["username"], mysql["password"], mysql["host"], mysql["port"], mysql["db"])
 }
+
+func SetHookBranch(name, branch string) error {
+	p := path.Join(AppPathPrefix, name, "hookbranch")
+	_, err := etcdClient.Set(p, branch, 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetHookBranch(name string) (string, error) {
+	p := path.Join(AppPathPrefix, name, "hookbranch")
+	r, err := etcdClient.Get(p, false, false)
+	if err != nil {
+		return "", err
+	}
+	if r.Node.Dir {
+		return "", ShouldNotBeDIR
+	}
+	return r.Node.Value, nil
+}
