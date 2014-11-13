@@ -99,7 +99,7 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 		}
 	}
 
-	testJSON := copy(configYamlJson)
+	testJSON := configYamlJson
 
 	// 注册过程如果已经有了mysql/redis那么复制过去
 	if mysql := app.GetDBInfo("mysql"); mysql != nil {
