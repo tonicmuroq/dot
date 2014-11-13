@@ -225,7 +225,7 @@ func (self *Application) MySQLDSN() string {
 
 func SetHookBranch(name, branch string) error {
 	p := path.Join(AppPathPrefix, name, "hookbranch")
-	_, err := etcdClient.Create(p, branch, 0)
+	_, err := etcdClient.Set(p, branch, 0)
 	if err != nil {
 		return err
 	}
