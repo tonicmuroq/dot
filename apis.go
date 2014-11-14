@@ -189,7 +189,7 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 	if app == nil {
 		return NoSuchApp
 	}
-	mysql, err := resources.NewMySQLInstance(app.Name)
+	mysql, err := resources.NewMySQLInstance(app.Name, app.Name)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
@@ -217,6 +217,18 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
 	return JSON{"r": 0, "msg": "", "redis": redis}
+}
+
+func SyncConfigFileHandler(req *http.Request) JSON {
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+
+	app := models.GetApplicationByNameAndVersion(name, version)
+	if app == nil {
+		return NoSuchApp
+	}
+	app.SyncConfigFiles()
+	return JSON{"r": 0, "msg": "ok"}
 }
 
 func SyncDBHandler(req *http.Request) JSON {
@@ -277,6 +289,7 @@ func init() {
 			"/app/:app/:version/update":      UpdateApplicationHandler,
 			"/app/:app/:version/remove":      RemoveApplicationHandler,
 			"/container/:cid/remove":         RemoveContainerHandler,
+			"/resource/:app/:version/sync":   SyncConfigFileHandler,
 			"/resource/:app/:version/mysql":  NewMySQLInstanceHandler,
 			"/resource/:app/:version/syncdb": SyncDBHandler,
 			"/resource/:app/:version/redis":  NewRedisInstanceHandler,

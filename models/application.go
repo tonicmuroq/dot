@@ -87,8 +87,7 @@ func NewApplication(projectname, version, group, appyaml string) *Application {
 		return nil
 	}
 
-	app.copyConfigFile("prod", "config")
-	app.copyConfigFile("test", "test")
+	app.SyncConfigFiles()
 
 	if appYaml, err := YAMLEncode(appYamlDict); err == nil {
 		etcdClient.Create(app.GetYamlPath("app"), appYaml, 0)
@@ -225,6 +224,11 @@ func (self *Application) MySQLDSN(env, key string) string {
 	}
 	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
 		mysql["username"], mysql["password"], mysql["host"], mysql["port"], mysql["db"])
+}
+
+func (self *Application) SyncConfigFiles() {
+	self.copyConfigFile("prod", "config")
+	self.copyConfigFile("test", "test")
 }
 
 func SetHookBranch(name, branch string) error {

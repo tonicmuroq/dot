@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-func Post(addr string, form url.Values) (map[string]string, error) {
+func Post(addr string, form url.Values) (map[string]interface{}, error) {
 	r, err := http.PostForm(addr, form)
 	if err != nil {
 		return nil, err
@@ -17,7 +17,7 @@ func Post(addr string, form url.Values) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var data map[string]string
+	var data map[string]interface{}
 	err = json.Unmarshal(content, &data)
 	if err != nil {
 		return nil, err
