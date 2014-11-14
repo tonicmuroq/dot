@@ -238,9 +238,9 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 	var dbName string
 	switch env {
 	case "test":
-		dbName = fmt.Sprintf("%s_test", app.Name)
+		dbName = fmt.Sprintf("%s_test$%s", app.Name, redisName)
 	case "prod":
-		dbName = app.Name
+		dbName = fmt.Sprintf("%s$%s", app.Name, redisName)
 	default:
 		dbName = ""
 	}
