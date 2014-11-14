@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"github.com/astaxie/beego/orm"
 	"path"
-	"strings"
 	"time"
 )
 
 var (
-	AppPathPrefix  = "/NBE/"
-	ShouldNotBeDIR = errors.New("should not be dir")
+	AppPathPrefix       = "/NBE/"
+	ShouldNotBeDIR      = errors.New("should not be dir")
+	NoKeyFound          = errors.New("no key found")
+	NoResourceFound     = errors.New("no resource found")
+	AlreadyHaveResource = errors.New("already have this resource")
 )
 
 type Application struct {
@@ -40,7 +42,7 @@ type AppYaml struct {
 	Schema   string   `json:schema`
 }
 
-type ConfigYaml map[string]interface{}
+type ConfigYaml map[string]map[string]interface{}
 
 // Application
 func (self *Application) TableUnique() [][]string {
@@ -57,23 +59,16 @@ func GetApplicationById(appId int) *Application {
 	return &app
 }
 
-func NewApplication(projectname, version, group, appyaml, configyaml string) *Application {
-	if configyaml == "" {
-		configyaml = "{}"
-	}
-	var appYamlJson AppYaml
-	var configYamlJson ConfigYaml
+func NewApplication(projectname, version, group, appyaml string) *Application {
+	var appYamlDict AppYaml
 
-	if err1, err2 := JSONDecode(appyaml, &appYamlJson), JSONDecode(configyaml, &configYamlJson); err1 != nil || err2 != nil {
-		Logger.Info("app.yaml error: ", err1)
-		Logger.Info("config.yaml error: ", err2)
+	if err := JSONDecode(appyaml, &appYamlDict); err != nil {
+		Logger.Info("app.yaml error: ", err)
 		return nil
 	}
-	Logger.Debug("app.yaml: ", appYamlJson)
-	Logger.Debug("config.yaml: ", configYamlJson)
+	Logger.Debug("app.yaml: ", appYamlDict)
 
-	appName := appYamlJson.Appname
-
+	appName := appYamlDict.Appname
 	if app := GetApplicationByNameAndVersion(appName, version); app != nil {
 		Logger.Info("App already registered: ", app)
 		return app
@@ -86,46 +81,19 @@ func NewApplication(projectname, version, group, appyaml, configyaml string) *Ap
 	}
 
 	// 用户绑定应用
-	app := Application{Name: appName, Version: version, Pname: projectname, Group: group, User: user}
-	if _, err := db.Insert(&app); err != nil {
+	app := &Application{Name: appName, Version: version, Pname: projectname, Group: group, User: user}
+	if _, err := db.Insert(app); err != nil {
 		Logger.Info("Create App error: ", err)
 		return nil
 	}
 
-	// 清理config里的mysql/redis配置
-	for key, _ := range configYamlJson {
-		if strings.HasPrefix(key, "mysql") || strings.HasPrefix(key, "redis") {
-			delete(configYamlJson, key)
-		}
-	}
+	app.copyConfigFile("prod", "config")
+	app.copyConfigFile("test", "test")
 
-	testJSON := configYamlJson
-
-	// 注册过程如果已经有了mysql/redis那么复制过去
-	if mysql := app.GetDBInfo("mysql"); mysql != nil {
-		configYamlJson["mysql"] = mysql
+	if appYaml, err := YAMLEncode(appYamlDict); err == nil {
+		etcdClient.Create(app.GetYamlPath("app"), appYaml, 0)
 	}
-	if redis := app.GetDBInfo("redis"); redis != nil {
-		configYamlJson["redis"] = redis
-	}
-
-	if mysql := app.GetDBInfo("test-mysql"); mysql != nil {
-		testJSON["mysql"] = mysql
-	}
-	if redis := app.GetDBInfo("test-redis"); redis != nil {
-		testJSON["redis"] = redis
-	}
-
-	if configYaml, err := YAMLEncode(configYamlJson); err == nil {
-		etcdClient.Create((&app).GetYamlPath("config"), configYaml, 0)
-	}
-	if testYaml, err := YAMLEncode(testJSON); err == nil {
-		etcdClient.Create((&app).GetYamlPath("test"), testYaml, 0)
-	}
-	if appYaml, err := YAMLEncode(appYamlJson); err == nil {
-		etcdClient.Create((&app).GetYamlPath("app"), appYaml, 0)
-	}
-	return &app
+	return app
 }
 
 func GetApplicationByNameAndVersion(name, version string) *Application {
@@ -137,18 +105,20 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 }
 
 func (self *Application) CreateDNS() error {
-	dns := make(map[string]string)
-	dns["host"] = config.Config.Masteraddr
-	cpath := path.Join("/skydns/com/hunantv/intra", self.Name)
-	if _, err := etcdClient.Create(cpath, "", 0); err != nil {
+	dns := map[string]string{
+		"host": config.Config.Masteraddr,
+	}
+	p := path.Join("/skydns/com/hunantv/intra", self.Name)
+	_, err := etcdClient.Create(p, "", 0)
+	if err != nil {
 		return err
 	}
-	if r, err := JSONEncode(dns); err == nil {
-		etcdClient.Set(cpath, r, 0)
-		return nil
-	} else {
+	r, err := JSONEncode(dns)
+	if err != nil {
 		return err
 	}
+	etcdClient.Set(p, r, 0)
+	return nil
 }
 
 func (self *Application) GetYamlPath(cpath string) string {
@@ -169,22 +139,6 @@ func (self *Application) GetAppYaml() (*AppYaml, error) {
 		return nil, err
 	}
 	return &appYaml, nil
-}
-
-func (self *Application) GetConfigYaml() (*ConfigYaml, error) {
-	var configYaml ConfigYaml
-	cpath := self.GetYamlPath("config")
-	r, err := etcdClient.Get(cpath, false, false)
-	if err != nil {
-		return nil, err
-	}
-	if r.Node.Dir {
-		return nil, ShouldNotBeDIR
-	}
-	if err := YAMLDecode(r.Node.Value, &configYaml); err != nil {
-		return nil, err
-	}
-	return &configYaml, nil
 }
 
 func (self *Application) UserUid() int {
@@ -212,23 +166,61 @@ func (self *Application) AllVersionHosts() []*Host {
 	return hosts
 }
 
-func (self *Application) GetDBInfo(kind string) map[string]interface{} {
-	cpath := path.Join(AppPathPrefix, self.Name, kind)
-	r, err := etcdClient.Get(cpath, false, false)
+// env could be prod/test
+func resourceKey(name, env string) string {
+	if env != "prod" && env != "test" {
+		return ""
+	}
+	return path.Join(AppPathPrefix, name, fmt.Sprintf("resource-%s", env))
+}
+
+func resource(name, env string) map[string]map[string]interface{} {
+	p := resourceKey(name, env)
+	if p == "" {
+		return nil
+	}
+	r, err := etcdClient.Get(p, false, false)
 	if err != nil {
 		return nil
 	}
 	if r.Node.Dir {
 		return nil
 	}
-	var d map[string]interface{}
-	JSONDecode(r.Node.Value, &d)
+	var d map[string]map[string]interface{}
+	YAMLDecode(r.Node.Value, &d)
 	return d
 }
 
-func (self *Application) MySQLDSN() string {
-	mysql := self.GetDBInfo("mysql")
-	if mysql == nil {
+func (self *Application) Resource(env string) map[string]map[string]interface{} {
+	return resource(self.Name, env)
+}
+
+func (self *Application) copyConfigFile(env, key string) error {
+	p := resourceKey(self.Name, env)
+	if p == "" {
+		return NoKeyFound
+	}
+	r, err := etcdClient.Get(p, false, false)
+	if err != nil {
+		return err
+	}
+	if r.Node.Dir {
+		return ShouldNotBeDIR
+	}
+	_, err = etcdClient.Set(self.GetYamlPath(key), r.Node.Value, 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *Application) MySQLDSN(env, key string) string {
+	r := self.Resource(env)
+	if r == nil {
+		return ""
+	}
+	mysql, exists := r[key]
+	if !exists {
 		return ""
 	}
 	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
@@ -254,4 +246,26 @@ func GetHookBranch(name string) (string, error) {
 		return "", ShouldNotBeDIR
 	}
 	return r.Node.Value, nil
+}
+
+func AppendResource(name, env, key string, res map[string]interface{}) error {
+	p := resourceKey(name, env)
+	r := resource(name, env)
+	if r == nil {
+		r = make(map[string]map[string]interface{})
+	}
+	_, exists := r[key]
+	if exists {
+		return AlreadyHaveResource
+	}
+	r[key] = res
+	y, err := YAMLEncode(r)
+	if err != nil {
+		return err
+	}
+	_, err = etcdClient.Set(p, y, 0)
+	if err != nil {
+		return err
+	}
+	return nil
 }

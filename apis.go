@@ -37,9 +37,8 @@ func RegisterApplicationHandler(req *http.Request) JSON {
 	version := req.URL.Query().Get(":version")
 	group := req.Form.Get("group")
 	appyaml := req.Form.Get("appyaml")
-	configyaml := req.Form.Get("configyaml")
 
-	app := models.NewApplication(projectname, version, group, appyaml, configyaml)
+	app := models.NewApplication(projectname, version, group, appyaml)
 	if app == nil {
 		return JSON{"r": 1, "msg": "register app fail"}
 	}
@@ -194,6 +193,10 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
+	err = models.AppendResource(app.Name, "mysql", "prod", mysql)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
+	}
 	return JSON{"r": 0, "msg": "", "mysql": mysql}
 }
 
@@ -206,6 +209,10 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 		return NoSuchApp
 	}
 	redis, err := resources.NewRedisInstance(app.Name)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
+	}
+	err = models.AppendResource(app.Name, "redis", "prod", redis)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
@@ -223,12 +230,12 @@ func SyncDBHandler(req *http.Request) JSON {
 		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
 		return r
 	}
-	dsn := app.MySQLDSN()
+	dsn := app.MySQLDSN("prod", "mysql")
 	if dsn == "" {
 		r["msg"] = fmt.Sprintf("app %s, %s has no dsn", name, version)
 		return r
 	}
-	err := resources.SyncSchema(app.MySQLDSN(), schema)
+	err := resources.SyncSchema(dsn, schema)
 	if err != nil {
 		r["msg"] = err.Error()
 		return r
