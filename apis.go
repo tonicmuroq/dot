@@ -184,16 +184,36 @@ func RemoveContainerHandler(req *http.Request) JSON {
 func NewMySQLInstanceHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
+	mysqlName := req.Form.Get("name")
+	env := req.Form.Get("env")
+
+	if mysqlName == "" {
+		mysqlName = "mysql"
+	}
 
 	app := models.GetApplicationByNameAndVersion(name, version)
 	if app == nil {
 		return NoSuchApp
 	}
-	mysql, err := resources.NewMySQLInstance(app.Name, app.Name)
+
+	var dbName string
+	switch env {
+	case "test":
+		dbName = fmt.Sprintf("%s_test", app.Name)
+	case "prod":
+		dbName = app.Name
+	default:
+		dbName = ""
+	}
+	if dbName == "" {
+		return JSON{"r": 1, "msg": "env must be test/prod", "mysql": nil}
+	}
+
+	mysql, err := resources.NewMySQLInstance(dbName, app.Name)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
-	err = models.AppendResource(app.Name, "prod", "mysql", mysql)
+	err = models.AppendResource(app.Name, env, mysqlName, mysql)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
@@ -203,16 +223,36 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 func NewRedisInstanceHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
+	redisName := req.Form.Get("name")
+	env := req.Form.Get("env")
+
+	if redisName == "" {
+		redisName = "redis"
+	}
 
 	app := models.GetApplicationByNameAndVersion(name, version)
 	if app == nil {
 		return NoSuchApp
 	}
-	redis, err := resources.NewRedisInstance(app.Name)
+
+	var dbName string
+	switch env {
+	case "test":
+		dbName = fmt.Sprintf("%s_test", app.Name)
+	case "prod":
+		dbName = app.Name
+	default:
+		dbName = ""
+	}
+	if dbName == "" {
+		return JSON{"r": 1, "msg": "env must be test/prod", "redis": nil}
+	}
+
+	redis, err := resources.NewRedisInstance(dbName)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
-	err = models.AppendResource(app.Name, "prod", "redis", redis)
+	err = models.AppendResource(app.Name, env, redisName, redis)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
