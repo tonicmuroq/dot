@@ -250,6 +250,9 @@ func GetHookBranch(name string) (string, error) {
 
 func AppendResource(name, env, key string, res map[string]interface{}) error {
 	p := resourceKey(name, env)
+	if p == "" {
+		return NoKeyFound
+	}
 	r := resource(name, env)
 	if r == nil {
 		r = make(map[string]map[string]interface{})

@@ -193,7 +193,7 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
-	err = models.AppendResource(app.Name, "mysql", "prod", mysql)
+	err = models.AppendResource(app.Name, "prod", "mysql", mysql)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
@@ -212,7 +212,7 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
-	err = models.AppendResource(app.Name, "redis", "prod", redis)
+	err = models.AppendResource(app.Name, "prod", "redis", redis)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
