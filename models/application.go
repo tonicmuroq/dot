@@ -87,8 +87,6 @@ func NewApplication(projectname, version, group, appyaml string) *Application {
 		return nil
 	}
 
-	app.SyncConfigFiles()
-
 	if appYaml, err := YAMLEncode(appYamlDict); err == nil {
 		etcdClient.Create(app.GetYamlPath("app"), appYaml, 0)
 	}
@@ -194,25 +192,6 @@ func (self *Application) Resource(env string) map[string]map[string]interface{} 
 	return resource(self.Name, env)
 }
 
-func (self *Application) copyConfigFile(env, key string) error {
-	p := resourceKey(self.Name, env)
-	if p == "" {
-		return NoKeyFound
-	}
-	r, err := etcdClient.Get(p, false, false)
-	if err != nil {
-		return err
-	}
-	if r.Node.Dir {
-		return ShouldNotBeDIR
-	}
-	_, err = etcdClient.Set(self.GetYamlPath(key), r.Node.Value, 0)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (self *Application) MySQLDSN(env, key string) string {
 	r := self.Resource(env)
 	if r == nil {
@@ -224,11 +203,6 @@ func (self *Application) MySQLDSN(env, key string) string {
 	}
 	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
 		mysql["username"], mysql["password"], mysql["host"], mysql["port"], mysql["db"])
-}
-
-func (self *Application) SyncConfigFiles() {
-	self.copyConfigFile("prod", "config")
-	self.copyConfigFile("test", "test")
 }
 
 func SetHookBranch(name, branch string) error {

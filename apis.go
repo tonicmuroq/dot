@@ -259,18 +259,6 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "", "redis": redis}
 }
 
-func SyncConfigFileHandler(req *http.Request) JSON {
-	name := req.URL.Query().Get(":app")
-	version := req.URL.Query().Get(":version")
-
-	app := models.GetApplicationByNameAndVersion(name, version)
-	if app == nil {
-		return NoSuchApp
-	}
-	app.SyncConfigFiles()
-	return JSON{"r": 0, "msg": "ok"}
-}
-
 func SyncDBHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
@@ -329,7 +317,6 @@ func init() {
 			"/app/:app/:version/update":      UpdateApplicationHandler,
 			"/app/:app/:version/remove":      RemoveApplicationHandler,
 			"/container/:cid/remove":         RemoveContainerHandler,
-			"/resource/:app/:version/sync":   SyncConfigFileHandler,
 			"/resource/:app/:version/mysql":  NewMySQLInstanceHandler,
 			"/resource/:app/:version/syncdb": SyncDBHandler,
 			"/resource/:app/:version/redis":  NewRedisInstanceHandler,
