@@ -37,9 +37,8 @@ func RegisterApplicationHandler(req *http.Request) JSON {
 	version := req.URL.Query().Get(":version")
 	group := req.Form.Get("group")
 	appyaml := req.Form.Get("appyaml")
-	configyaml := req.Form.Get("configyaml")
 
-	app := models.NewApplication(projectname, version, group, appyaml, configyaml)
+	app := models.NewApplication(projectname, version, group, appyaml)
 	if app == nil {
 		return JSON{"r": 1, "msg": "register app fail"}
 	}
@@ -184,13 +183,35 @@ func RemoveContainerHandler(req *http.Request) JSON {
 
 func NewMySQLInstanceHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
-	version := req.URL.Query().Get(":version")
+	mysqlName := req.Form.Get("name")
+	env := req.Form.Get("env")
 
-	app := models.GetApplicationByNameAndVersion(name, version)
-	if app == nil {
+	if mysqlName == "" {
+		mysqlName = "mysql"
+	}
+
+	if !models.FindByName(name) {
 		return NoSuchApp
 	}
-	mysql, err := resources.NewMySQLInstance(app.Name)
+
+	var dbName string
+	switch env {
+	case "test":
+		dbName = fmt.Sprintf("%s_test", name)
+	case "prod":
+		dbName = name
+	default:
+		dbName = ""
+	}
+	if dbName == "" {
+		return JSON{"r": 1, "msg": "env must be test/prod", "mysql": nil}
+	}
+
+	mysql, err := resources.NewMySQLInstance(dbName, name)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
+	}
+	err = models.AppendResource(name, env, mysqlName, mysql)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
@@ -199,13 +220,35 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 
 func NewRedisInstanceHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
-	version := req.URL.Query().Get(":version")
+	redisName := req.Form.Get("name")
+	env := req.Form.Get("env")
 
-	app := models.GetApplicationByNameAndVersion(name, version)
-	if app == nil {
+	if redisName == "" {
+		redisName = "redis"
+	}
+
+	if !models.FindByName(name) {
 		return NoSuchApp
 	}
-	redis, err := resources.NewRedisInstance(app.Name)
+
+	var dbName string
+	switch env {
+	case "test":
+		dbName = fmt.Sprintf("%s_test$%s", name, redisName)
+	case "prod":
+		dbName = fmt.Sprintf("%s$%s", name, redisName)
+	default:
+		dbName = ""
+	}
+	if dbName == "" {
+		return JSON{"r": 1, "msg": "env must be test/prod", "redis": nil}
+	}
+
+	redis, err := resources.NewRedisInstance(dbName)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
+	}
+	err = models.AppendResource(name, env, redisName, redis)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
@@ -223,12 +266,12 @@ func SyncDBHandler(req *http.Request) JSON {
 		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
 		return r
 	}
-	dsn := app.MySQLDSN()
+	dsn := app.MySQLDSN("prod", "mysql")
 	if dsn == "" {
 		r["msg"] = fmt.Sprintf("app %s, %s has no dsn", name, version)
 		return r
 	}
-	err := resources.SyncSchema(app.MySQLDSN(), schema)
+	err := resources.SyncSchema(dsn, schema)
 	if err != nil {
 		r["msg"] = err.Error()
 		return r
@@ -239,6 +282,9 @@ func SyncDBHandler(req *http.Request) JSON {
 
 func AppBranchHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":name")
+	if !models.FindByName(name) {
+		return NoSuchApp
+	}
 	if req.Method == "PUT" {
 		branch := req.Form.Get("branch")
 		err := models.SetHookBranch(name, branch)
@@ -270,9 +316,9 @@ func init() {
 			"/app/:app/:version/update":      UpdateApplicationHandler,
 			"/app/:app/:version/remove":      RemoveApplicationHandler,
 			"/container/:cid/remove":         RemoveContainerHandler,
-			"/resource/:app/:version/mysql":  NewMySQLInstanceHandler,
+			"/resource/:app/mysql":           NewMySQLInstanceHandler,
 			"/resource/:app/:version/syncdb": SyncDBHandler,
-			"/resource/:app/:version/redis":  NewRedisInstanceHandler,
+			"/resource/:app/redis":           NewRedisInstanceHandler,
 		},
 		"GET": {
 			"/echo":            EchoHandler,
