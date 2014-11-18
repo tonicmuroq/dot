@@ -101,6 +101,16 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 	return &app
 }
 
+// 从名字查找, 没有就返回 false, 其他都是 true
+func FindByName(name string) bool {
+	var app Application
+	err := db.QueryTable(new(Application)).Filter("Name", name).One(&app)
+	if err == orm.ErrNoRows {
+		return false
+	}
+	return true
+}
+
 func (self *Application) CreateDNS() error {
 	dns := map[string]string{
 		"host": config.Config.Masteraddr,

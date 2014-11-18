@@ -183,7 +183,6 @@ func RemoveContainerHandler(req *http.Request) JSON {
 
 func NewMySQLInstanceHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
-	version := req.URL.Query().Get(":version")
 	mysqlName := req.Form.Get("name")
 	env := req.Form.Get("env")
 
@@ -191,17 +190,16 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 		mysqlName = "mysql"
 	}
 
-	app := models.GetApplicationByNameAndVersion(name, version)
-	if app == nil {
+	if !models.FindByName(name) {
 		return NoSuchApp
 	}
 
 	var dbName string
 	switch env {
 	case "test":
-		dbName = fmt.Sprintf("%s_test", app.Name)
+		dbName = fmt.Sprintf("%s_test", name)
 	case "prod":
-		dbName = app.Name
+		dbName = name
 	default:
 		dbName = ""
 	}
@@ -209,11 +207,11 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 		return JSON{"r": 1, "msg": "env must be test/prod", "mysql": nil}
 	}
 
-	mysql, err := resources.NewMySQLInstance(dbName, app.Name)
+	mysql, err := resources.NewMySQLInstance(dbName, name)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
-	err = models.AppendResource(app.Name, env, mysqlName, mysql)
+	err = models.AppendResource(name, env, mysqlName, mysql)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
@@ -222,7 +220,6 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 
 func NewRedisInstanceHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
-	version := req.URL.Query().Get(":version")
 	redisName := req.Form.Get("name")
 	env := req.Form.Get("env")
 
@@ -230,17 +227,16 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 		redisName = "redis"
 	}
 
-	app := models.GetApplicationByNameAndVersion(name, version)
-	if app == nil {
+	if !models.FindByName(name) {
 		return NoSuchApp
 	}
 
 	var dbName string
 	switch env {
 	case "test":
-		dbName = fmt.Sprintf("%s_test$%s", app.Name, redisName)
+		dbName = fmt.Sprintf("%s_test$%s", name, redisName)
 	case "prod":
-		dbName = fmt.Sprintf("%s$%s", app.Name, redisName)
+		dbName = fmt.Sprintf("%s$%s", name, redisName)
 	default:
 		dbName = ""
 	}
@@ -252,7 +248,7 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
-	err = models.AppendResource(app.Name, env, redisName, redis)
+	err = models.AppendResource(name, env, redisName, redis)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
@@ -286,6 +282,9 @@ func SyncDBHandler(req *http.Request) JSON {
 
 func AppBranchHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":name")
+	if !models.FindByName(name) {
+		return NoSuchApp
+	}
 	if req.Method == "PUT" {
 		branch := req.Form.Get("branch")
 		err := models.SetHookBranch(name, branch)
@@ -317,9 +316,9 @@ func init() {
 			"/app/:app/:version/update":      UpdateApplicationHandler,
 			"/app/:app/:version/remove":      RemoveApplicationHandler,
 			"/container/:cid/remove":         RemoveContainerHandler,
-			"/resource/:app/:version/mysql":  NewMySQLInstanceHandler,
+			"/resource/:app/mysql":           NewMySQLInstanceHandler,
 			"/resource/:app/:version/syncdb": SyncDBHandler,
-			"/resource/:app/:version/redis":  NewRedisInstanceHandler,
+			"/resource/:app/redis":           NewRedisInstanceHandler,
 		},
 		"GET": {
 			"/echo":            EchoHandler,
