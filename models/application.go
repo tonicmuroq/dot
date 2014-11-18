@@ -87,6 +87,10 @@ func NewApplication(projectname, version, group, appyaml string) *Application {
 		return nil
 	}
 
+	// create test/prod empty yaml file for levi
+	etcdClient.Create(resourceKey(appName, "test"), "", 0)
+	etcdClient.Create(resourceKey(appName, "prod"), "", 0)
+
 	if appYaml, err := YAMLEncode(appYamlDict); err == nil {
 		etcdClient.Create(app.GetYamlPath("app"), appYaml, 0)
 	}
