@@ -255,6 +255,21 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "", "redis": redis}
 }
 
+func RemoveResourceHandler(req *http.Request) JSON {
+	name := req.URL.Query().Get(":app")
+	key := req.Form.Get("name")
+	env := req.Form.Get("env")
+
+	if !models.FindByName(name) {
+		return NoSuchApp
+	}
+	err := models.RemoveResource(name, env, key)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+	return JSON{"r": 0, "msg": "ok"}
+}
+
 func SyncDBHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
@@ -319,6 +334,7 @@ func init() {
 			"/resource/:app/mysql":           NewMySQLInstanceHandler,
 			"/resource/:app/:version/syncdb": SyncDBHandler,
 			"/resource/:app/redis":           NewRedisInstanceHandler,
+			"/resource/:app/remove":          RemoveResourceHandler,
 		},
 		"GET": {
 			"/echo":            EchoHandler,
