@@ -264,3 +264,24 @@ func AppendResource(name, env, key string, res map[string]interface{}) error {
 	}
 	return nil
 }
+
+func RemoveResource(name, env, key string) error {
+	p := resourceKey(name, env)
+	if p == "" {
+		return NoKeyFound
+	}
+	r := resource(name, env)
+	if r == nil {
+		return NoResourceFound
+	}
+	delete(r, key)
+	y, err := YAMLEncode(r)
+	if err != nil {
+		return err
+	}
+	_, err = etcdClient.Set(p, y, 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
