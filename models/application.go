@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/astaxie/beego/orm"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -27,22 +28,61 @@ type Application struct {
 	Group     string
 	Created   time.Time `orm:"auto_now_add;type(datetime)"`
 	ImageAddr string
+	Manager   *ManagerSet `orm:"-"`
 }
 
 type AppYaml struct {
-	Appname  string   `json:appname`
-	Runtime  string   `json:runtime`
-	Port     int      `json:port`
-	Cmd      []string `json:cmd`
-	Daemon   []string `json:daemon`
-	Test     []string `json:test`
-	Build    []string `json:build`
-	Services []string `json:services`
-	Static   string   `json:static`
-	Schema   string   `json:schema`
+	Appname        string   `json:"appname"`
+	Runtime        string   `json:"runtime"`
+	Port           int      `json:"port"`
+	Cmd            []string `json:"cmd"`
+	Daemon         []string `json:"daemon"`
+	Test           []string `json:"test"`
+	Build          []string `json:"build"`
+	Static         string   `json:"static"`
+	Schema         string   `json:"schema"`
+	ReleaseManager []string `json:"release_manager" yaml:"release_manager"`
 }
 
-type ConfigYaml map[string]map[string]interface{}
+type ManagerSet struct {
+	App     string
+	manager map[string]struct{}
+}
+
+func NewManagerSet(app string) *ManagerSet {
+	m := ManagerSet{App: app, manager: map[string]struct{}{}}
+	p := path.Join(AppPathPrefix, app, "release_manager")
+	r, err := etcdClient.Get(p, false, false)
+	if err != nil || r.Node.Dir {
+		return &m
+	}
+	names := strings.Split(r.Node.Value, "\n")
+	for _, name := range names {
+		m.manager[name] = struct{}{}
+	}
+	return &m
+}
+
+func (self *ManagerSet) SetManager(names []string) error {
+	m := strings.Join(names, "\n")
+	p := path.Join(AppPathPrefix, self.App, "release_manager")
+	_, err := etcdClient.Set(p, m, 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self ManagerSet) IsManager(name string) bool {
+	if name == "NBEBot" {
+		return true
+	}
+	if len(self.manager) == 0 {
+		return true
+	}
+	_, exists := self.manager[name]
+	return exists
+}
 
 // Application
 func (self *Application) TableUnique() [][]string {
@@ -56,10 +96,11 @@ func GetApplicationById(appId int) *Application {
 	if err := db.QueryTable(new(Application)).Filter("Id", appId).One(&app); err != nil {
 		return nil
 	}
+	app.Manager = NewManagerSet(app.Name)
 	return &app
 }
 
-func NewApplication(projectname, version, group, appyaml string) *Application {
+func NewApplication(projectname, version, group, appyaml, submitter string) *Application {
 	var appYamlDict AppYaml
 
 	if err := JSONDecode(appyaml, &appYamlDict); err != nil {
@@ -80,8 +121,18 @@ func NewApplication(projectname, version, group, appyaml string) *Application {
 		return nil
 	}
 
+	// 设置新的release manager
+	m := NewManagerSet(appName)
+	if !m.IsManager(submitter) {
+		Logger.Info("current user is ", submitter, " not manager")
+		return nil
+	}
+
+	m.SetManager(appYamlDict.ReleaseManager)
+
 	// 用户绑定应用
 	app := &Application{Name: appName, Version: version, Pname: projectname, Group: group, User: user}
+	app.Manager = NewManagerSet(app.Name)
 	if _, err := db.Insert(app); err != nil {
 		Logger.Info("Create App error: ", err)
 		return nil
@@ -102,6 +153,7 @@ func GetApplicationByNameAndVersion(name, version string) *Application {
 	if err := db.QueryTable(new(Application)).Filter("Name", name).Filter("Version", version).RelatedSel().One(&app); err != nil {
 		return nil
 	}
+	app.Manager = NewManagerSet(app.Name)
 	return &app
 }
 
@@ -217,6 +269,10 @@ func (self *Application) MySQLDSN(env, key string) string {
 	}
 	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
 		mysql["username"], mysql["password"], mysql["host"], mysql["port"], mysql["db"])
+}
+
+func (self *Application) IsManager(name string) bool {
+	return self.Manager.IsManager(name)
 }
 
 func SetHookBranch(name, branch string) error {

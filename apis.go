@@ -38,7 +38,10 @@ func RegisterApplicationHandler(req *http.Request) JSON {
 	group := req.Form.Get("group")
 	appyaml := req.Form.Get("appyaml")
 
-	app := models.NewApplication(projectname, version, group, appyaml)
+	// user := req.Header.Get("NBE-User")
+	user := "NBEBot"
+
+	app := models.NewApplication(projectname, version, group, appyaml, user)
 	if app == nil {
 		return JSON{"r": 1, "msg": "register app fail"}
 	}
