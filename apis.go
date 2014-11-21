@@ -299,7 +299,7 @@ func SyncDBHandler(req *http.Request) JSON {
 }
 
 func AppBranchHandler(req *http.Request) JSON {
-	name := req.URL.Query().Get(":name")
+	name := req.URL.Query().Get(":app")
 	if !models.FindByName(name) {
 		return NoSuchApp
 	}
