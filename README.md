@@ -29,29 +29,36 @@ Dot 有一个配置文件, `dot.yaml.sample`, 运行的时候只需要重命名�
         - "pip install -i http://pypi.douban.com/simple/ ./depends/docker-registry-core && pip install -i http://pypi.douban.com/simple/ ../docker-registry && pip install -i http://pypi.douban.com/simple/ mysql-python"
     cmd:
         - "gunicorn -c gunicorn_config.py app:application"
-    services:
-        - "mysql"
-        - "redis"
+    test:
+        - "python test.py"
+    daemon:
+        - "python daemon.py"
+    static: "docker/static"
         
 * port: 应用在容器内部的端口, 需要被暴露出来的. 一个应用只暴露一个端口, 如果需要多个, 那么可能你需要考虑一下怎么解耦他们成为多个应用.
 * runtime: 运行时环境, 提供 Python, Java 等.
 * build: 打包构建镜像的时候需要执行的命令, 可以认为是运行环境初始化的命令, 会做一些依赖安装等操作.
 * cmd: 启动容器的命令, 也就是告诉 NBE 用什么样的命令来执行你的容器.
-* services: 目前支持 MySQL 和 Redis, 会根据这个来生成不同的 config.yaml.
+* test: 运行测试的命令, 如果测试成功返回值需要是 0, 非 0 返回值都认为失败.
+* static: 静态文件, 这部分文件会由 nginx 直接 serve. 暂时还没有接入静态文件的打包和压缩混淆.
 
-### 这是一个应用的 config.yaml 的例子:
+### 如果你不需要使用 NBE 的资源, 那么自己把自己的资源写代码里就可以了
 
-目前只支持 MySQL 和 Redis 的自动替换配置. 应用需要的任何配置都可以写在这里, 只有 mysql/redis 会被自动替换, 其他配置都是原有的.
+### 如果你需要使用 NBE 的资源, 这是一个应用的 config.yaml 的例子:
 
-    mysql:
+在 Marco 里你可以手动指定一个资源的名字, 创建一个 MySQL 实例或者一个 Redis 实例, 下面是一个已经创建好的例子:
+
+    read_mysql:
         username: "docker-registry"
         password: "3d6#!2ef"
         host: "10.1.201.58"
         port: 3306
         db: docker-registry
-    redis:
+    write_redis:
         host: "10.1.201.5"
         port: 6379
+        
+read_mysql 是一个 MySQL 实例, write_redis 是一个 Redis 实例, 名字可以自己取. 在应用里只需要读 config.yaml 的内容, 然后使用喜欢的客户端代码去连接就可以了.
       
 * mysql: 本地运行时需要使用的 MySQL 的配置信息
 * redis: 本地运行时需要使用的 Redis 的配置信息
