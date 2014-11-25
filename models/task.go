@@ -393,7 +393,8 @@ func RemoveContainerTask(container *Container) *Task {
 
 func UpdateContainerTask(container *Container, app *Application) *Task {
 	host := container.Host()
-	if host == nil {
+	oldApp := container.Application()
+	if host == nil || oldApp == nil {
 		return nil
 	}
 	appYaml, err := app.GetAppYaml()
@@ -401,7 +402,7 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		return nil
 	}
 	rmImg := false
-	if cs := GetContainerByHostAndApp(host, app); len(cs) == 1 {
+	if cs := GetContainerByHostAndApp(host, oldApp); len(cs) == 1 {
 		rmImg = true
 	}
 
