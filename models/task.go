@@ -400,6 +400,10 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 	if err != nil {
 		return nil
 	}
+	rmImg := false
+	if cs := GetContainerByHostAndApp(host, app); len(cs) == 1 {
+		rmImg = true
+	}
 
 	bind := 0
 	daemonId := ""
@@ -439,6 +443,7 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 		CpuSet:    config.Config.Task.CpuSet,
 		Daemon:    daemonId,
 		Container: container.ContainerId,
+		RmImage:   rmImg,
 	}
 }
 
