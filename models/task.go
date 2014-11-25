@@ -83,6 +83,7 @@ type Task struct {
 	Test      string
 	Container string
 	Build     BuildTask
+	RmImage   bool
 }
 
 type GroupedTask struct {
@@ -274,7 +275,7 @@ func (self *Task) ToRemoveTask() *RemoveTask {
 		Name:      self.Name,
 		Version:   self.Version,
 		Container: self.Container,
-		RmImage:   false,
+		RmImage:   self.RmImage,
 		done:      false,
 	}
 }
@@ -361,6 +362,13 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 func RemoveContainerTask(container *Container) *Task {
 	app := container.Application()
 	host := container.Host()
+	if host == nil || app == nil {
+		return nil
+	}
+	rmImg := false
+	if cs := GetContainerByHostAndApp(host, app); len(cs) == 1 {
+		rmImg = true
+	}
 	if app == nil || host == nil {
 		return nil
 	}
@@ -379,6 +387,7 @@ func RemoveContainerTask(container *Container) *Task {
 		Type:      RemoveContainer,
 		Uid:       0,
 		Container: container.ContainerId,
+		RmImage:   rmImg,
 	}
 }
 
