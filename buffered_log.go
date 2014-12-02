@@ -2,12 +2,10 @@ package main
 
 import (
 	. "./utils"
-	"fmt"
 	"github.com/gorilla/websocket"
 	"net/http"
 	"strconv"
 	"sync"
-	"time"
 )
 
 type BufferedLog struct {
@@ -41,15 +39,6 @@ func (self StreamLogHub) RemoveBufferedLog(id int) {
 	}
 	b.Stop()
 	delete(self, id)
-}
-
-func (self StreamLogHub) Report() {
-	for {
-		select {
-		case <-time.After(5 * time.Second):
-			Logger.Debug(fmt.Sprintf("log hub has %d items", len(self)))
-		}
-	}
 }
 
 var (
