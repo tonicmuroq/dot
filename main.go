@@ -17,8 +17,6 @@ func main() {
 
 	go hub.CheckAlive()
 	go hub.Run()
-	// FIXME 之后要删掉的
-	go streamLogHub.Report()
 
 	http.Handle("/", RestServer)
 	http.HandleFunc("/ws", ServeWs)
