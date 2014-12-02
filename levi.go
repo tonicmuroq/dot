@@ -205,14 +205,11 @@ func doStatus(host *models.Host, data string) {
 
 func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
-	b := streamLogHub.GetBufferedLog(task.Id, true)
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
 		return
 	}
-
 	if st := models.GetStoredTaskById(task.Id); st != nil {
-		b.Feed(retval)
 		switch reply.Done {
 		case true:
 			if !task.IsTest() {
@@ -226,7 +223,6 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 				// 理论上不可能出现任务是测试Type是ADD_TASK同时又是Done为true的
 				st.Done(models.FAIL, retval)
 			}
-			streamLogHub.RemoveBufferedLog(task.Id)
 			task.Done()
 		case false:
 			if !task.IsTest() {
