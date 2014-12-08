@@ -59,9 +59,6 @@ func (self *Hub) CheckAlive() {
 			// 如果一个连接不再存在, 那么删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
 				Logger.Info(host, " is disconnected.")
-				if h := models.GetHostByIP(host); h != nil {
-					h.Offline()
-				}
 				self.RemoveLevi(host)
 			}
 		}
@@ -151,6 +148,9 @@ func (self *Hub) RemoveLevi(host string) {
 	levi, ok := self.levis[host]
 	if !ok || levi == nil {
 		return
+	}
+	if h := models.GetHostByIP(host); h != nil {
+		h.Offline()
 	}
 	delete(self.levis, host)
 	delete(self.lastCheckTime, host)
