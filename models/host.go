@@ -3,9 +3,10 @@ package models
 import "../config"
 
 type Host struct {
-	Id   int
-	IP   string `orm:"column(ip)"`
-	Name string
+	Id     int
+	IP     string `orm:"column(ip)"`
+	Name   string
+	Status int
 }
 
 type HostPort struct {
@@ -21,10 +22,13 @@ func (self *Host) TableUnique() [][]string {
 }
 
 func NewHost(ip, name string) *Host {
-	host := Host{IP: ip, Name: name}
-	if _, id, err := db.ReadOrCreate(&host, "IP"); err == nil {
+	host := &Host{IP: ip, Name: name, Status: 0}
+	if _, id, err := db.ReadOrCreate(host, "IP"); err == nil {
 		host.Id = int(id)
-		return &host
+		if host.Status != 0 {
+			host.Online()
+		}
+		return host
 	}
 	return nil
 }
@@ -45,6 +49,16 @@ func GetHostByIP(ip string) *Host {
 		return nil
 	}
 	return &host
+}
+
+func (self *Host) Online() {
+	self.Status = 0
+	db.Update(self)
+}
+
+func (self *Host) Offline() {
+	self.Status = 1
+	db.Update(self)
 }
 
 // 注意里面可能有nil
