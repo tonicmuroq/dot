@@ -3,55 +3,49 @@ package models
 import . "../utils"
 
 type Container struct {
-	Id          int
+	ID          int `orm:"column(id);auto;pk"`
 	Port        int
-	ContainerId string
-	IdentId     string
-	HostId      int
-	AppId       int
+	ContainerID string `orm:"column(container_id)"`
+	IdentID     string `orm:"column(ident_id)"`
+	HostID      int    `orm:"column(host_id)"`
 	AppName     string
+	Version     string
 }
 
-// Container
-func (self *Container) TableIndex() [][]string {
-	return [][]string{
-		[]string{"AppId"},
-		[]string{"ContainerId"},
-		[]string{"AppName"},
-		[]string{"host_id"}, /* TODO 有点tricky */
-	}
+func (c *Container) Application() *Application {
+	return GetApplication(c.AppName)
 }
 
-func (self *Container) Application() *Application {
-	return GetApplicationById(self.AppId)
+func (c *Container) AppVersion() *AppVersion {
+	return GetVersion(c.AppName, c.Version)
 }
 
-func (self *Container) Host() *Host {
-	return GetHostById(self.HostId)
+func (c *Container) Host() *Host {
+	return GetHostByID(c.HostID)
 }
 
-func (self *Container) Delete() bool {
-	host := self.Host()
+func (c *Container) Delete() bool {
+	host := c.Host()
 	if host != nil {
-		host.RemovePort(self.Port)
+		host.RemovePort(c.Port)
 	} else {
 		Logger.Debug("Host not found when deleting container")
 		return false
 	}
-	if _, err := db.Delete(&Container{Id: self.Id}); err == nil {
+	if _, err := db.Delete(&Container{ID: c.ID}); err == nil {
 		return true
 	}
 	return false
 }
 
-func NewContainer(app *Application, host *Host, port int, containerId, daemonId string) *Container {
+func NewContainer(av *AppVersion, host *Host, port int, containerID, identID string) *Container {
 	c := Container{
 		Port:        port,
-		ContainerId: containerId,
-		IdentId:     daemonId,
-		AppId:       app.Id,
-		HostId:      host.Id,
-		AppName:     app.Name,
+		ContainerID: containerID,
+		IdentID:     identID,
+		HostID:      host.ID,
+		AppName:     av.Name,
+		Version:     av.Version,
 	}
 	if _, err := db.Insert(&c); err == nil {
 		return &c
@@ -61,15 +55,27 @@ func NewContainer(app *Application, host *Host, port int, containerId, daemonId 
 
 func GetContainerByCid(cid string) *Container {
 	var container Container
-	err := db.QueryTable(new(Container)).Filter("ContainerId", cid).One(&container)
+	err := db.QueryTable(new(Container)).Filter("ContainerID", cid).One(&container)
 	if err != nil {
 		return nil
 	}
 	return &container
 }
 
-func GetContainerByHostAndApp(host *Host, app *Application) []*Container {
+func GetContainerByHostAndApp(host *Host, appname string) []*Container {
 	var cs []*Container
-	db.QueryTable(new(Container)).Filter("HostId", host.Id).Filter("AppId", app.Id).OrderBy("Port").All(&cs)
+	db.QueryTable(new(Container)).Filter("HostID", host.ID).Filter("AppName", appname).OrderBy("Port").All(&cs)
+	return cs
+}
+
+func GetContainerByHostAndAppVersion(host *Host, av *AppVersion) []*Container {
+	var cs []*Container
+	db.QueryTable(new(Container)).Filter("HostID", host.ID).Filter("AppName", av.Name).Filter("Version", av.Version).OrderBy("Port").All(&cs)
+	return cs
+}
+
+func GetContainerByHost(host *Host) []*Container {
+	var cs []*Container
+	db.QueryTable(new(Container)).Filter("HostID", host.ID).OrderBy("Port").All(&cs)
 	return cs
 }

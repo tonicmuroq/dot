@@ -20,15 +20,20 @@ var (
 )
 
 type Application struct {
-	Id        int
+	ID        int `orm:"auto;pk;column(id)"`
+	Name      string
+	Pname     string
+	Namespace string
+	User      *User       `orm:"rel(fk)"`
+	Manager   *ManagerSet `orm:"-"`
+}
+
+type AppVersion struct {
+	ID        int `orm:"auto;pk;column(id)"`
 	Name      string
 	Version   string
-	Pname     string
-	User      *User `orm:"rel(fk)"`
-	Group     string
 	Created   time.Time `orm:"auto_now_add;type(datetime)"`
-	ImageAddr string
-	Manager   *ManagerSet `orm:"-"`
+	ImageAddr string    `orm:"default("")"`
 }
 
 type AppYaml struct {
@@ -45,13 +50,13 @@ type AppYaml struct {
 }
 
 type ManagerSet struct {
-	App     string
+	appname string
 	manager map[string]struct{}
 }
 
-func NewManagerSet(app string) *ManagerSet {
-	m := ManagerSet{App: app, manager: map[string]struct{}{}}
-	p := path.Join(AppPathPrefix, app, "release_manager")
+func NewManagerSet(appname string) *ManagerSet {
+	m := ManagerSet{appname: appname, manager: map[string]struct{}{}}
+	p := path.Join(AppPathPrefix, appname, "release_manager")
 	r, err := etcdClient.Get(p, false, false)
 	if err != nil || r.Node.Dir {
 		return &m
@@ -65,7 +70,7 @@ func NewManagerSet(app string) *ManagerSet {
 
 func (self *ManagerSet) SetManager(names []string) error {
 	m := strings.Join(names, "\n")
-	p := path.Join(AppPathPrefix, self.App, "release_manager")
+	p := path.Join(AppPathPrefix, self.appname, "release_manager")
 	_, err := etcdClient.Set(p, m, 0)
 	if err != nil {
 		return err
@@ -73,7 +78,7 @@ func (self *ManagerSet) SetManager(names []string) error {
 	return nil
 }
 
-func (self ManagerSet) IsManager(name string) bool {
+func (self *ManagerSet) IsManager(name string) bool {
 	if name == "NBEBot" {
 		return true
 	}
@@ -84,45 +89,70 @@ func (self ManagerSet) IsManager(name string) bool {
 	return exists
 }
 
-// Application
-func (self *Application) TableUnique() [][]string {
-	return [][]string{
-		[]string{"Name", "Version"},
-	}
-}
-
-func GetApplicationById(appId int) *Application {
+func GetApplication(appname string) *Application {
 	var app Application
-	if err := db.QueryTable(new(Application)).Filter("Id", appId).One(&app); err != nil {
+	if err := db.QueryTable(new(Application)).Filter("Name", appname).RelatedSel().One(&app); err != nil {
 		return nil
 	}
 	app.Manager = NewManagerSet(app.Name)
 	return &app
 }
 
-func NewApplication(projectname, version, group, appyaml, submitter string) *Application {
+func GetVersion(appname, version string) *AppVersion {
+	var v AppVersion
+	err := db.QueryTable(new(AppVersion)).Filter("Name", appname).Filter("Version", version).One(&v)
+	if err != nil {
+		return nil
+	}
+	return &v
+}
+
+func GetVersionByID(id int) *AppVersion {
+	var v AppVersion
+	err := db.QueryTable(new(AppVersion)).Filter("ID", id).One(&v)
+	if err != nil {
+		return nil
+	}
+	return &v
+}
+
+func newApplication(appname, projectname, namespace string) *Application {
+	user := NewUser(appname)
+	if user == nil {
+		return nil
+	}
+	app := &Application{Name: appname, Pname: projectname, Namespace: namespace, User: user}
+	_, id, err := db.ReadOrCreate(app, "Name")
+	if err != nil {
+		return nil
+	}
+	app.ID = int(id)
+	return app
+}
+
+func newVersion(appname, version string) *AppVersion {
+	v := &AppVersion{Name: appname, Version: version}
+	_, id, err := db.ReadOrCreate(v, "Name", "Version")
+	if err != nil {
+		return nil
+	}
+	v.ID = int(id)
+	return v
+}
+
+// 项目名, 版本号, gitlab的ns, yaml的yaml格式, 提交者
+func Register(projectname, version, namespace, appyaml, submitter string) *Application {
 	var appYamlDict AppYaml
 
-	if err := JSONDecode(appyaml, &appYamlDict); err != nil {
+	if err := YAMLDecode(appyaml, &appYamlDict); err != nil {
 		Logger.Info("app.yaml error: ", err)
 		return nil
 	}
 	Logger.Debug("app.yaml: ", appYamlDict)
 
-	appName := appYamlDict.Appname
-	if app := GetApplicationByNameAndVersion(appName, version); app != nil {
-		Logger.Info("App already registered: ", app)
-		return app
-	}
-
-	// 生成新用户
-	user := NewUser(appName)
-	if user == nil {
-		return nil
-	}
-
+	appname := appYamlDict.Appname
 	// 设置新的release manager
-	m := NewManagerSet(appName)
+	m := NewManagerSet(appname)
 	if !m.IsManager(submitter) {
 		Logger.Info("current user is ", submitter, " not manager")
 		return nil
@@ -130,48 +160,30 @@ func NewApplication(projectname, version, group, appyaml, submitter string) *App
 
 	m.SetManager(appYamlDict.ReleaseManager)
 
-	// 用户绑定应用
-	app := &Application{Name: appName, Version: version, Pname: projectname, Group: group, User: user}
-	app.Manager = NewManagerSet(app.Name)
-	if _, err := db.Insert(app); err != nil {
-		Logger.Info("Create App error: ", err)
+	app := newApplication(appname, projectname, namespace)
+	if app == nil {
+		Logger.Info("app create failed")
 		return nil
 	}
+	av := newVersion(appname, version)
+	if av == nil {
+		Logger.Info("version create failed")
+		return nil
+	}
+	app.Manager = NewManagerSet(appname)
 
 	// create test/prod empty yaml file for levi
-	etcdClient.Create(resourceKey(appName, "test"), "", 0)
-	etcdClient.Create(resourceKey(appName, "prod"), "", 0)
-
-	if appYaml, err := YAMLEncode(appYamlDict); err == nil {
-		etcdClient.Create(app.GetYamlPath("app"), appYaml, 0)
-	}
+	etcdClient.Create(resourceKey(appname, "test"), "", 0)
+	etcdClient.Create(resourceKey(appname, "prod"), "", 0)
+	etcdClient.Create(av.GetYamlPath("app"), appyaml, 0)
 	return app
 }
 
-func GetApplicationByNameAndVersion(name, version string) *Application {
-	var app Application
-	if err := db.QueryTable(new(Application)).Filter("Name", name).Filter("Version", version).RelatedSel().One(&app); err != nil {
-		return nil
-	}
-	app.Manager = NewManagerSet(app.Name)
-	return &app
-}
-
-// 从名字查找, 没有就返回 false, 其他都是 true
-func FindByName(name string) bool {
-	var app Application
-	err := db.QueryTable(new(Application)).Filter("Name", name).One(&app)
-	if err == orm.ErrNoRows {
-		return false
-	}
-	return true
-}
-
-func (self *Application) CreateDNS() error {
+func (a *Application) CreateDNS() error {
 	dns := map[string]string{
 		"host": config.Config.Masteraddr,
 	}
-	p := path.Join("/skydns/com/hunantv/intra", self.Name)
+	p := path.Join("/skydns/com/hunantv/intra", a.Name)
 	_, err := etcdClient.Create(p, "", 0)
 	if err != nil {
 		return err
@@ -184,14 +196,14 @@ func (self *Application) CreateDNS() error {
 	return nil
 }
 
-func (self *Application) GetYamlPath(cpath string) string {
-	return path.Join(AppPathPrefix, self.Name, self.Version, fmt.Sprintf("%s.yaml", cpath))
+func (av *AppVersion) GetYamlPath(p string) string {
+	return path.Join(AppPathPrefix, av.Name, av.Version, fmt.Sprintf("%s.yaml", p))
 }
 
-func (self *Application) GetAppYaml() (*AppYaml, error) {
+func (av *AppVersion) GetAppYaml() (*AppYaml, error) {
 	var appYaml AppYaml
-	cpath := self.GetYamlPath("app")
-	r, err := etcdClient.Get(cpath, false, false)
+	p := av.GetYamlPath("app")
+	r, err := etcdClient.Get(p, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -204,25 +216,36 @@ func (self *Application) GetAppYaml() (*AppYaml, error) {
 	return &appYaml, nil
 }
 
-func (self *Application) UserUid() int {
-	return self.User.Id
+func (av *AppVersion) UserUID() int {
+	app := GetApplication(av.Name)
+	return app.UserUID()
 }
 
-func (self *Application) SetImageAddr(addr string) {
-	self.ImageAddr = addr
-	db.Update(self)
+func (a *Application) UserUID() int {
+	return a.User.ID
 }
 
-func (self *Application) Containers() []*Container {
+func (av *AppVersion) SetImageAddr(addr string) {
+	av.ImageAddr = addr
+	db.Update(av)
+}
+
+func (a *Application) Containers() []*Container {
 	var cs []*Container
-	db.QueryTable(new(Container)).Filter("AppId", self.Id).OrderBy("Port").All(&cs)
+	db.QueryTable(new(Container)).Filter("Name", a.Name).OrderBy("Port").All(&cs)
 	return cs
 }
 
-func (self *Application) AllVersionHosts() []*Host {
+func (av *AppVersion) Containers() []*Container {
+	var cs []*Container
+	db.QueryTable(new(Container)).Filter("Name", av.Name).Filter("Version", av.Version).OrderBy("Port").All(&cs)
+	return cs
+}
+
+func (a *Application) AllVersionHosts() []*Host {
 	var rs orm.ParamsList
 	var hosts []*Host
-	_, err := db.Raw("SELECT distinct(host_id) FROM container WHERE app_name=?", self.Name).ValuesFlat(&rs)
+	_, err := db.Raw("SELECT distinct(host_id) FROM container WHERE app_name=?", a.Name).ValuesFlat(&rs)
 	if err == nil && len(rs) > 0 {
 		db.QueryTable(new(Host)).Filter("id__in", rs).All(&hosts)
 	}
@@ -254,12 +277,12 @@ func resource(name, env string) map[string]map[string]interface{} {
 	return d
 }
 
-func (self *Application) Resource(env string) map[string]map[string]interface{} {
-	return resource(self.Name, env)
+func (a *Application) Resource(env string) map[string]map[string]interface{} {
+	return resource(a.Name, env)
 }
 
-func (self *Application) MySQLDSN(env, key string) string {
-	r := self.Resource(env)
+func (a *Application) MySQLDSN(env, key string) string {
+	r := a.Resource(env)
 	if r == nil {
 		return ""
 	}
@@ -271,8 +294,8 @@ func (self *Application) MySQLDSN(env, key string) string {
 		mysql["username"], mysql["password"], mysql["host"], mysql["port"], mysql["db"])
 }
 
-func (self *Application) IsManager(name string) bool {
-	return self.Manager.IsManager(name)
+func (a *Application) IsManager(name string) bool {
+	return a.Manager.IsManager(name)
 }
 
 func SetHookBranch(name, branch string) error {

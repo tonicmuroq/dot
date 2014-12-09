@@ -3,28 +3,22 @@ package models
 import "../config"
 
 type Host struct {
-	Id     int
+	ID     int    `orm:"column(id);auto;pk"`
 	IP     string `orm:"column(ip)"`
 	Name   string
 	Status int
 }
 
-type HostPort struct {
-	Id     int
-	HostId int
+type Port struct {
+	ID     int `orm:"column(id);auto;pk"`
+	HostID int `orm:"column(host_id)"`
 	Port   int
-}
-
-func (self *Host) TableUnique() [][]string {
-	return [][]string{
-		[]string{"IP"},
-	}
 }
 
 func NewHost(ip, name string) *Host {
 	host := &Host{IP: ip, Name: name, Status: 0}
 	if _, id, err := db.ReadOrCreate(host, "IP"); err == nil {
-		host.Id = int(id)
+		host.ID = int(id)
 		if host.Status != 0 {
 			host.Online()
 		}
@@ -33,9 +27,9 @@ func NewHost(ip, name string) *Host {
 	return nil
 }
 
-func GetHostById(hostId int) *Host {
+func GetHostByID(hostID int) *Host {
 	var host Host
-	err := db.QueryTable(new(Host)).Filter("Id", hostId).One(&host)
+	err := db.QueryTable(new(Host)).Filter("ID", hostID).One(&host)
 	if err != nil {
 		return nil
 	}
@@ -51,14 +45,14 @@ func GetHostByIP(ip string) *Host {
 	return &host
 }
 
-func (self *Host) Online() {
-	self.Status = 0
-	db.Update(self)
+func (h *Host) Online() {
+	h.Status = 0
+	db.Update(h)
 }
 
-func (self *Host) Offline() {
-	self.Status = 1
-	db.Update(self)
+func (h *Host) Offline() {
+	h.Status = 1
+	db.Update(h)
 }
 
 // 注意里面可能有nil
@@ -70,15 +64,13 @@ func GetHostsByIPs(ips []string) []*Host {
 	return hosts
 }
 
-func (self *Host) Containers() []*Container {
-	var cs []*Container
-	db.QueryTable(new(Container)).Filter("HostId", self.Id).OrderBy("Port").All(&cs)
-	return cs
+func (h *Host) Containers() []*Container {
+	return GetContainerByHost(h)
 }
 
-func (self *Host) Ports() []int {
-	var ports []*HostPort
-	db.QueryTable(new(HostPort)).Filter("HostId", self.Id).OrderBy("Port").All(&ports)
+func (h *Host) Ports() []int {
+	var ports []*Port
+	db.QueryTable(new(Port)).Filter("HostID", h.ID).OrderBy("Port").All(&ports)
 	r := make([]int, len(ports))
 	for i := 0; i < len(ports); i = i + 1 {
 		r[i] = ports[i].Port
@@ -86,13 +78,13 @@ func (self *Host) Ports() []int {
 	return r
 }
 
-func (self *Host) AddPort(port int) {
-	hostPort := HostPort{HostId: self.Id, Port: port}
-	db.Insert(&hostPort)
+func (h *Host) AddPort(port int) {
+	p := Port{HostID: h.ID, Port: port}
+	db.Insert(&p)
 }
 
-func (self *Host) RemovePort(port int) {
-	db.Raw("DELETE FROM host_port WHERE host_id=? AND port=?", self.Id, port).Exec()
+func (h *Host) RemovePort(port int) {
+	db.Raw("DELETE FROM port WHERE host_id=? AND port=?", h.ID, port).Exec()
 }
 
 // 获取一个host上的可用的一个端口

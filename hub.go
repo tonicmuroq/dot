@@ -93,43 +93,49 @@ func (self *Hub) Run() {
 }
 
 func (self *Hub) RestartNginx() {
-	for _, appId := range self.appIds {
-		if app := models.GetApplicationById(appId); app != nil {
-
-			conf := path.Join(config.Config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
-			var data = struct {
-				Name  string
-				Path  string
-				Hosts []string
-			}{
-				Name:  app.Name,
-				Path:  path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", app.Name, app.Version)),
-				Hosts: []string{},
-			}
-
-			hosts := app.AllVersionHosts()
-
-			if len(hosts) == 0 {
-				EnsureFileAbsent(conf)
-			} else {
-				f, err := os.Create(conf)
-				defer f.Close()
-				if err != nil {
-					Logger.Info("Create nginx conf failed", err)
-					continue
-				}
-				for _, host := range hosts {
-					hostStr := fmt.Sprintf("%s:%v", host.IP, config.Config.Nginx.Port)
-					data.Hosts = append(data.Hosts, hostStr)
-				}
-				tmpl := template.Must(template.ParseFiles(config.Config.Nginx.Template))
-				if err := tmpl.Execute(f, data); err != nil {
-					Logger.Info("Render nginx conf failed", err)
-				}
-			}
-
-			app.CreateDNS()
+	for _, avID := range self.appIds {
+		av := models.GetVersionByID(avID)
+		if av == nil {
+			continue
 		}
+		app := models.GetApplication(av.Name)
+		if app == nil {
+			continue
+		}
+
+		conf := path.Join(config.Config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
+		var data = struct {
+			Name  string
+			Path  string
+			Hosts []string
+		}{
+			Name:  app.Name,
+			Path:  path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", av.Name, av.Version)),
+			Hosts: []string{},
+		}
+
+		hosts := app.AllVersionHosts()
+
+		if len(hosts) == 0 {
+			EnsureFileAbsent(conf)
+		} else {
+			f, err := os.Create(conf)
+			defer f.Close()
+			if err != nil {
+				Logger.Info("Create nginx conf failed", err)
+				continue
+			}
+			for _, host := range hosts {
+				hostStr := fmt.Sprintf("%s:%v", host.IP, config.Config.Nginx.Port)
+				data.Hosts = append(data.Hosts, hostStr)
+			}
+			tmpl := template.Must(template.ParseFiles(config.Config.Nginx.Template))
+			if err := tmpl.Execute(f, data); err != nil {
+				Logger.Info("Render nginx conf failed", err)
+			}
+		}
+
+		app.CreateDNS()
 	}
 	cmd := exec.Command("nginx", "-s", "reload")
 	if err := cmd.Run(); err != nil {
@@ -169,14 +175,14 @@ func (self *Hub) Dispatch(host string, task *models.Task) error {
 		return errors.New("task is nil")
 	}
 	if !ok || levi == nil {
-		if st := models.GetStoredTaskById(task.Id); st != nil {
-			st.Done(models.FAIL, "failed cuz no levi alive")
+		if job := models.GetJob(task.ID); job != nil {
+			job.Done(models.FAIL, "failed cuz no levi alive")
 		}
 		return errors.New(fmt.Sprintf("%s levi not exists", host))
 	}
 	levi.inTask <- task
-	if task != nil && (task.Type == models.TestApplication || task.Type == models.BuildImage) {
-		streamLogHub.GetBufferedLog(task.Id, true)
+	if task != nil && (task.Type == models.TESTAPPLICATION || task.Type == models.BUILDIMAGE) {
+		streamLogHub.GetBufferedLog(task.ID, true)
 	}
 	return nil
 }
