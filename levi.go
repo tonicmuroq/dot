@@ -60,7 +60,7 @@ func (self *Levi) WaitTask() {
 				self.tasks[key] = &models.GroupedTask{
 					Name:    task.Name,
 					Uid:     task.Uid,
-					Id:      uuid.New(),
+					ID:      uuid.New(),
 					Version: task.Version,
 					Tasks:   []*models.Task{},
 				}
@@ -100,7 +100,7 @@ func (self *Levi) SendTasks() {
 		go func(groupedTask *models.GroupedTask) {
 			defer self.wg.Done()
 			leviGroupedTask := groupedTask.ToLeviGroupedTask()
-			self.waiting[groupedTask.Id] = leviGroupedTask
+			self.waiting[groupedTask.ID] = leviGroupedTask
 			if err := self.conn.ws.WriteJSON(&leviGroupedTask); err != nil {
 				Logger.Info(err, "JSON write error")
 			}
@@ -126,7 +126,7 @@ func (self *Levi) Run() {
 			finish = true
 		default:
 
-			taskUUID := taskReply.Id
+			taskUUID := taskReply.ID
 
 			if taskUUID == "__STATUS__" {
 				doStatus(host, taskReply.Data)
@@ -139,34 +139,34 @@ func (self *Levi) Run() {
 				continue
 			}
 
-			app := models.GetApplicationByNameAndVersion(lgt.Name, lgt.Version)
-			if app == nil {
-				Logger.Info(fmt.Sprintf("App %v", app), "没了")
+			av := models.GetVersion(lgt.Name, lgt.Version)
+			if av == nil {
+				Logger.Info(fmt.Sprintf("AppVersion %v", av), "没了")
 				continue
 			}
 
 			lt := lgt.Tasks
 
 			switch taskReply.Type {
-			case models.ADD_TASK:
-				doAdd(app, host, lt.Add, taskReply)
-			case models.REMOVE_TASK:
+			case models.ADD:
+				doAdd(av, host, lt.Add, taskReply)
+			case models.REMOVE:
 				doRemove(lt.Remove, taskReply)
-			case models.BUILD_TASK:
-				doBuild(app, lt.Build, taskReply)
-			case models.TEST_TASK:
-				doTest(app, lt.Add, taskReply)
-			case models.INFO_TASK:
+			case models.BUILD:
+				doBuild(av, lt.Build, taskReply)
+			case models.TEST:
+				doTest(av, lt.Add, taskReply)
+			case models.INFO:
 				doStatus(host, taskReply.Data)
 			}
 
 			if lgt.Done() {
 
 				if lgt.NeedToRestartNginx() {
-					hub.done <- app.Id
+					hub.done <- av.ID
 				}
 
-				if len(models.GetContainerByHostAndApp(host, app)) == 0 {
+				if len(models.GetContainerByHostAndApp(host, av.Name)) == 0 {
 					hub.immediate <- true
 				}
 
@@ -203,25 +203,25 @@ func doStatus(host *models.Host, data string) {
 	}
 }
 
-func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, reply models.TaskReply) {
+func doAdd(av *models.AppVersion, host *models.Host, tasks []*models.AddTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
 		return
 	}
-	if st := models.GetStoredTaskById(task.Id); st != nil {
+	if job := models.GetJob(task.ID); job != nil {
 		switch reply.Done {
 		case true:
 			if !task.IsTest() {
 				if retval != "" {
-					st.Done(models.SUCC, retval)
-					models.NewContainer(app, host, task.Bind, retval, task.Daemon)
+					job.Done(models.SUCC, retval)
+					models.NewContainer(av, host, task.Bind, retval, task.Daemon)
 				} else {
-					st.Done(models.FAIL, retval)
+					job.Done(models.FAIL, retval)
 				}
 			} else {
 				// 理论上不可能出现任务是测试Type是ADD_TASK同时又是Done为true的
-				st.Done(models.FAIL, retval)
+				job.Done(models.FAIL, retval)
 			}
 			task.Done()
 		case false:
@@ -231,10 +231,10 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 			} else {
 				// 如果测试任务就没返回容器值, 那么直接挂
 				if retval != "" {
-					st.SetResult(retval)
-					models.NewContainer(app, host, task.Bind, retval, task.Test)
+					job.SetResult(retval)
+					models.NewContainer(av, host, task.Bind, retval, task.Test)
 				} else {
-					st.Done(models.FAIL, "failed when create testing container")
+					job.Done(models.FAIL, "failed when create testing container")
 				}
 			}
 		}
@@ -242,14 +242,14 @@ func doAdd(app *models.Application, host *models.Host, tasks []*models.AddTask, 
 
 }
 
-func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskReply) {
+func doTest(av *models.AppVersion, tasks []*models.AddTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
-	b := streamLogHub.GetBufferedLog(task.Id, true)
+	b := streamLogHub.GetBufferedLog(task.ID, true)
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
 		return
 	}
-	if st := models.GetStoredTaskById(task.Id); st != nil {
+	if job := models.GetJob(task.ID); job != nil {
 		b.Feed(retval)
 		switch reply.Done {
 		case false:
@@ -257,17 +257,17 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 			Logger.Debug("Test output stream: ", retval)
 		case true:
 			if task.IsTest() {
-				container := models.GetContainerByCid(st.Result)
+				container := models.GetContainerByCid(job.Result)
 				if container == nil {
 					return
 				}
 				if retval == "0" {
-					st.Done(models.SUCC, fmt.Sprintf("%s|%s", container.IdentId, retval))
+					job.Done(models.SUCC, fmt.Sprintf("%s|%s", container.IdentID, retval))
 				} else {
-					st.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentId, retval))
+					job.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentID, retval))
 				}
 				container.Delete()
-				streamLogHub.RemoveBufferedLog(task.Id)
+				streamLogHub.RemoveBufferedLog(task.ID)
 			}
 			task.Done()
 		}
@@ -275,9 +275,9 @@ func doTest(app *models.Application, tasks []*models.AddTask, reply models.TaskR
 
 }
 
-func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.TaskReply) {
+func doBuild(av *models.AppVersion, tasks []*models.BuildTask, reply models.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
-	b := streamLogHub.GetBufferedLog(task.Id, true)
+	b := streamLogHub.GetBufferedLog(task.ID, true)
 	b.Feed(retval)
 
 	if task == nil {
@@ -289,21 +289,21 @@ func doBuild(app *models.Application, tasks []*models.BuildTask, reply models.Ta
 	case false:
 		Logger.Debug("Build output stream: ", retval)
 	case true:
-		appUserUid := app.UserUid()
-		staticPath := path.Join(config.Config.Nginx.Staticdir, app.Name, app.Version)
-		staticSrcPath := path.Join(config.Config.Nginx.Staticsrcdir, app.Name, app.Version)
+		appUserUid := av.UserUID()
+		staticPath := path.Join(config.Config.Nginx.Staticdir, av.Name, av.Version)
+		staticSrcPath := path.Join(config.Config.Nginx.Staticsrcdir, av.Name, av.Version)
 		if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
 			Logger.Info("copy files error: ", err)
 		}
-		if st := models.GetStoredTaskById(task.Id); st != nil {
+		if job := models.GetJob(task.ID); job != nil {
 			if retval != "" {
-				st.Done(models.SUCC, retval)
-				app.SetImageAddr(retval)
+				job.Done(models.SUCC, retval)
+				av.SetImageAddr(retval)
 			} else {
-				st.Done(models.FAIL, retval)
+				job.Done(models.FAIL, retval)
 			}
 		}
-		streamLogHub.RemoveBufferedLog(task.Id)
+		streamLogHub.RemoveBufferedLog(task.ID)
 		task.Done()
 	}
 }
@@ -325,11 +325,11 @@ func doRemove(tasks []*models.RemoveTask, reply models.TaskReply) {
 			Logger.Info("要删的容器已经不在了")
 		}
 		// build 根据返回值来判断是不是成功
-		if st := models.GetStoredTaskById(task.Id); st != nil {
+		if job := models.GetJob(task.ID); job != nil {
 			if retval == "1" {
-				st.Done(models.SUCC, "removed")
+				job.Done(models.SUCC, "removed")
 			} else {
-				st.Done(models.FAIL, "not removed")
+				job.Done(models.FAIL, "not removed")
 			}
 		}
 		task.Done()

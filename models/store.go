@@ -17,7 +17,7 @@ func LoadStore() {
 	orm.RegisterDataBase(config.Config.Db.Name, config.Config.Db.Use, config.Config.Db.Url, 30)
 	orm.RegisterDataBase(config.Config.Dbmgr.Name, config.Config.Dbmgr.Use, config.Config.Dbmgr.Url, 30)
 
-	orm.RegisterModel(new(Application), new(User), new(Host), new(Container), new(HostPort), new(StoredTask))
+	orm.RegisterModel(new(Application), new(AppVersion), new(User), new(Host), new(Container), new(Port), new(Job))
 	orm.RunSyncdb(config.Config.Db.Name, false, false)
 	db = orm.NewOrm()
 

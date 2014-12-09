@@ -5,27 +5,27 @@ import (
 	"errors"
 )
 
-func DeployApplicationHelper(app *models.Application, hosts []*models.Host, daemon bool) ([]int, error) {
+func DeployApplicationHelper(av *models.AppVersion, hosts []*models.Host, daemon bool) ([]int, error) {
 	var err error
 	taskIds := []int{}
 	for _, host := range hosts {
 		if host == nil {
 			continue
 		}
-		cs := models.GetContainerByHostAndApp(host, app)
+		cs := models.GetContainerByHostAndAppVersion(host, av)
 		if len(cs) == 0 {
-			task := models.AddContainerTask(app, host, daemon)
+			task := models.AddContainerTask(av, host, daemon)
 			if task != nil {
-				taskIds = append(taskIds, task.Id)
+				taskIds = append(taskIds, task.ID)
 				err = hub.Dispatch(host.IP, task)
 			} else {
 				err = errors.New("task created error")
 			}
 		} else {
 			for _, c := range cs {
-				task := models.UpdateContainerTask(c, app)
+				task := models.UpdateContainerTask(c, av)
 				if task != nil {
-					taskIds = append(taskIds, task.Id)
+					taskIds = append(taskIds, task.ID)
 					err = hub.Dispatch(host.IP, task)
 				} else {
 					err = errors.New("task created error")
@@ -36,13 +36,13 @@ func DeployApplicationHelper(app *models.Application, hosts []*models.Host, daem
 	return taskIds, err
 }
 
-func RemoveApplicationFromHostHelper(app *models.Application, host *models.Host) ([]int, error) {
+func RemoveApplicationFromHostHelper(av *models.AppVersion, host *models.Host) ([]int, error) {
 	var err error
 	taskIds := []int{}
-	for _, c := range models.GetContainerByHostAndApp(host, app) {
+	for _, c := range models.GetContainerByHostAndAppVersion(host, av) {
 		task := models.RemoveContainerTask(c)
 		if task != nil {
-			taskIds = append(taskIds, task.Id)
+			taskIds = append(taskIds, task.ID)
 			err = hub.Dispatch(host.IP, task)
 		} else {
 			err = errors.New("task created error")
@@ -51,19 +51,19 @@ func RemoveApplicationFromHostHelper(app *models.Application, host *models.Host)
 	return taskIds, err
 }
 
-func UpdateApplicationHelper(fromApp, toApp *models.Application, hosts []*models.Host) ([]int, error) {
+func UpdateApplicationHelper(from, to *models.AppVersion, hosts []*models.Host) ([]int, error) {
 	var err error
 	taskIds := []int{}
 	for _, host := range hosts {
 		if host == nil {
 			continue
 		}
-		oldContainers := models.GetContainerByHostAndApp(host, fromApp)
+		oldContainers := models.GetContainerByHostAndAppVersion(host, from)
 		if len(oldContainers) > 0 {
 			for _, c := range oldContainers {
-				task := models.UpdateContainerTask(c, toApp)
+				task := models.UpdateContainerTask(c, to)
 				if task != nil {
-					taskIds = append(taskIds, task.Id)
+					taskIds = append(taskIds, task.ID)
 					err = hub.Dispatch(host.IP, task)
 				} else {
 					err = errors.New("task created error")

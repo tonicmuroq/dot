@@ -41,7 +41,7 @@ func RegisterApplicationHandler(req *http.Request) JSON {
 	// user := req.Header.Get("NBE-User")
 	user := "NBEBot"
 
-	app := models.NewApplication(projectname, version, group, appyaml, user)
+	app := models.Register(projectname, version, group, appyaml, user)
 	if app == nil {
 		return JSON{"r": 1, "msg": "register app fail"}
 	}
@@ -54,21 +54,21 @@ func AddContainerHandler(req *http.Request) JSON {
 	ip := req.Form.Get("host")
 	daemon := req.Form.Get("daemon")
 
-	app := models.GetApplicationByNameAndVersion(name, version)
+	av := models.GetVersion(name, version)
 	host := models.GetHostByIP(ip)
 
-	if app == nil || host == nil {
+	if av == nil || host == nil {
 		return NoSuchApp
 	}
-	if appyaml, err := app.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
+	if appyaml, err := av.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
 		return JSON{"r": 1, "msg": "daemon set true but no daemon defined"}
 	}
-	task := models.AddContainerTask(app, host, daemon == "true")
+	task := models.AddContainerTask(av, host, daemon == "true")
 	err := hub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
-	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
 func BuildImageHandler(req *http.Request) JSON {
@@ -77,18 +77,18 @@ func BuildImageHandler(req *http.Request) JSON {
 	// 暂时没有monitor, 那么人肉指定host吧
 	ip := req.Form.Get("host")
 
-	app := models.GetApplicationByNameAndVersion(name, version)
+	av := models.GetVersion(name, version)
 	host := models.GetHostByIP(ip)
-	if app == nil || host == nil {
+	if av == nil || host == nil {
 		return NoSuchApp
 	}
 	base := req.Form.Get("base")
-	task := models.BuildImageTask(app, base)
+	task := models.BuildImageTask(av, base)
 	err := hub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
-	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
 func TestImageHandler(req *http.Request) JSON {
@@ -97,17 +97,17 @@ func TestImageHandler(req *http.Request) JSON {
 	// 暂时没有monitor, 那么人肉指定host吧
 	ip := req.Form.Get("host")
 
-	app := models.GetApplicationByNameAndVersion(name, version)
+	av := models.GetVersion(name, version)
 	host := models.GetHostByIP(ip)
-	if app == nil || host == nil {
+	if av == nil || host == nil {
 		return NoSuchApp
 	}
-	task := models.TestApplicationTask(app, host)
+	task := models.TestApplicationTask(av, host)
 	err := hub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
-	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
 func DeployApplicationHandler(req *http.Request) JSON {
@@ -116,15 +116,15 @@ func DeployApplicationHandler(req *http.Request) JSON {
 	ips := req.Form["hosts"]
 	daemon := req.Form.Get("daemon")
 
-	app := models.GetApplicationByNameAndVersion(name, version)
+	av := models.GetVersion(name, version)
 	hosts := models.GetHostsByIPs(ips)
-	if app == nil {
+	if av == nil {
 		return NoSuchApp
 	}
-	if appyaml, err := app.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
+	if appyaml, err := av.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
 		return JSON{"r": 1, "msg": "no daemon defined"}
 	}
-	taskIds, err := DeployApplicationHelper(app, hosts, daemon == "true")
+	taskIds, err := DeployApplicationHelper(av, hosts, daemon == "true")
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -136,12 +136,12 @@ func RemoveApplicationHandler(req *http.Request) JSON {
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
 
-	app := models.GetApplicationByNameAndVersion(name, version)
+	av := models.GetVersion(name, version)
 	host := models.GetHostByIP(ip)
-	if app == nil || host == nil {
+	if av == nil || host == nil {
 		return NoSuchApp
 	}
-	taskIds, err := RemoveApplicationFromHostHelper(app, host)
+	taskIds, err := RemoveApplicationFromHostHelper(av, host)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -155,13 +155,13 @@ func UpdateApplicationHandler(req *http.Request) JSON {
 	ips := req.Form["hosts"]
 	toVersion := req.Form.Get("to")
 
-	fromApp := models.GetApplicationByNameAndVersion(name, fromVersion)
-	toApp := models.GetApplicationByNameAndVersion(name, toVersion)
+	from := models.GetVersion(name, fromVersion)
+	to := models.GetVersion(name, toVersion)
 	hosts := models.GetHostsByIPs(ips)
-	if fromApp == nil || toApp == nil {
-		return JSON{"r": 1, "msg": fmt.Sprintf("no such app %v, %v", fromApp, toApp)}
+	if from == nil || to == nil {
+		return JSON{"r": 1, "msg": fmt.Sprintf("no such app %v, %v", from, to)}
 	}
-	taskIds, err := UpdateApplicationHelper(fromApp, toApp, hosts)
+	taskIds, err := UpdateApplicationHelper(from, to, hosts)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -181,7 +181,7 @@ func RemoveContainerHandler(req *http.Request) JSON {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
-	return JSON{"r": 0, "msg": "ok", "task_id": task.Id}
+	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
 func NewMySQLInstanceHandler(req *http.Request) JSON {
@@ -193,7 +193,7 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 		mysqlName = "mysql"
 	}
 
-	if !models.FindByName(name) {
+	if app := models.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 
@@ -230,7 +230,7 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 		redisName = "redis"
 	}
 
-	if !models.FindByName(name) {
+	if app := models.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 
@@ -263,7 +263,7 @@ func RemoveResourceHandler(req *http.Request) JSON {
 	key := req.Form.Get("name")
 	env := req.Form.Get("env")
 
-	if !models.FindByName(name) {
+	if app := models.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 	err := models.RemoveResource(name, env, key)
@@ -275,18 +275,17 @@ func RemoveResourceHandler(req *http.Request) JSON {
 
 func SyncDBHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
-	version := req.URL.Query().Get(":version")
 	schema := req.Form.Get("schema")
 
 	r := JSON{"r": 1, "msg": ""}
-	app := models.GetApplicationByNameAndVersion(name, version)
+	app := models.GetApplication(name)
 	if app == nil {
-		r["msg"] = fmt.Sprintf("app %s, %s not found", name, version)
+		r["msg"] = fmt.Sprintf("app %s, %s not found", name)
 		return r
 	}
 	dsn := app.MySQLDSN("prod", "mysql")
 	if dsn == "" {
-		r["msg"] = fmt.Sprintf("app %s, %s has no dsn", name, version)
+		r["msg"] = fmt.Sprintf("app %s, %s has no dsn", name)
 		return r
 	}
 	err := resources.SyncSchema(dsn, schema)
@@ -300,7 +299,7 @@ func SyncDBHandler(req *http.Request) JSON {
 
 func AppBranchHandler(req *http.Request) JSON {
 	name := req.URL.Query().Get(":app")
-	if !models.FindByName(name) {
+	if app := models.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 	if req.Method == "PUT" {

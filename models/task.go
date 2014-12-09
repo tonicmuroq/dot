@@ -4,34 +4,18 @@ import (
 	"../config"
 	. "../utils"
 	"strings"
-	"time"
 )
 
 const (
-	AddContainer    = 1
-	RemoveContainer = 2
-	UpdateContainer = 3
-	BuildImage      = 4
-	TestApplication = 5
-	HostInfo        = 6
-
-	RUNNING = 0
-	DONE    = 1
-
-	// 原本的语义已经改了...
-	// 这个应该叫做 YES/NO
-	SUCC = 1
-	FAIL = 0
-
-	ADD_TASK    = 1
-	REMOVE_TASK = 2
-	BUILD_TASK  = 3
-	INFO_TASK   = 4
-	TEST_TASK   = 5
+	ADDCONTAINER    = 1
+	REMOVECONTAINER = 2
+	UPDATECONTAINER = 3
+	BUILDIMAGE      = 4
+	TESTAPPLICATION = 5
 )
 
 type BuildTask struct {
-	Id      int
+	ID      int `json:"id"`
 	Name    string
 	Version string
 	Group   string
@@ -43,7 +27,7 @@ type BuildTask struct {
 }
 
 type AddTask struct {
-	Id        int
+	ID        int `json:"id"`
 	Name      string
 	Version   string
 	Bind      int
@@ -58,7 +42,7 @@ type AddTask struct {
 }
 
 type RemoveTask struct {
-	Id        int
+	ID        int `json:"id"`
 	Name      string
 	Version   string
 	Container string
@@ -67,7 +51,7 @@ type RemoveTask struct {
 }
 
 type Task struct {
-	Id        int
+	ID        int `json:"id"`
 	Name      string
 	Version   string
 	Port      int
@@ -89,7 +73,7 @@ type Task struct {
 type GroupedTask struct {
 	Name    string
 	Uid     int
-	Id      string
+	ID      string `json: "id"`
 	Version string
 	Tasks   []*Task
 }
@@ -101,7 +85,7 @@ type LeviTasks struct {
 }
 
 type LeviGroupedTask struct {
-	Id      string
+	ID      string `json:"id"`
 	Uid     int
 	Name    string
 	Version string
@@ -109,30 +93,13 @@ type LeviGroupedTask struct {
 	Tasks   *LeviTasks
 }
 
-type StatusInfo struct {
-	Type    string
-	Appname string
-	Id      string
-}
-
 // sent back from Levi
 type TaskReply struct {
-	Id    string
+	ID    string `json:"id"`
 	Done  bool
 	Index int
 	Type  int
 	Data  string
-}
-
-type StoredTask struct {
-	Id       int
-	AppId    int // 对应应用
-	Status   int // 对应状态, Running/Done
-	Succ     int // 成功/失败
-	Kind     int // 类型, Add/Remove/Update/Build/Test
-	Result   string
-	Created  time.Time `orm:"auto_now_add;type(datetime)"`
-	Finished time.Time `orm:"auto_now;type(datetime)"`
 }
 
 func (self *BuildTask) Done() {
@@ -173,7 +140,7 @@ func (self *LeviTasks) Done() bool {
 
 func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
 	lgt := &LeviGroupedTask{
-		Id:      self.Id,
+		ID:      self.ID,
 		Uid:     self.Uid,
 		Name:    self.Name,
 		Version: self.Version,
@@ -182,75 +149,25 @@ func (self *GroupedTask) ToLeviGroupedTask() *LeviGroupedTask {
 	lt := &LeviTasks{}
 	for _, task := range self.Tasks {
 		switch task.Type {
-		case AddContainer, TestApplication:
+		case ADDCONTAINER, TESTAPPLICATION:
 			lt.Add = append(lt.Add, task.ToAddTask())
-		case RemoveContainer:
+		case REMOVECONTAINER:
 			lt.Remove = append(lt.Remove, task.ToRemoveTask())
-		case UpdateContainer:
+		case UPDATECONTAINER:
 			lt.Add = append(lt.Add, task.ToAddTask())
 			lt.Remove = append(lt.Remove, task.ToRemoveTask())
-		case BuildImage:
+		case BUILDIMAGE:
 			lt.Build = append(lt.Build, task.ToBuildTask())
-		case HostInfo:
-			lgt.Info = true
 		}
 	}
 	lgt.Tasks = lt
 	return lgt
 }
 
-// StoredTask
-func (self *StoredTask) TableIndex() [][]string {
-	return [][]string{
-		[]string{"AppId"},
-		[]string{"Status"},
-		[]string{"Kind"},
-	}
-}
-
-func GetStoredTaskById(id int) *StoredTask {
-	var st StoredTask
-	if err := db.QueryTable(new(StoredTask)).Filter("Id", id).One(&st); err != nil {
-		return nil
-	} else {
-		return &st
-	}
-}
-
-func NewStoredTask(appId, kind int) *StoredTask {
-	st := StoredTask{AppId: appId, Status: RUNNING, Succ: FAIL, Kind: kind}
-	if _, err := db.Insert(&st); err == nil {
-		return &st
-	} else {
-		return nil
-	}
-}
-
-func GetStoredTaskByAppAndRet(appId int, ret string) *StoredTask {
-	var st StoredTask
-	if err := db.QueryTable(new(StoredTask)).Filter("AppId", appId).Filter("Result", ret).One(&st); err != nil {
-		return nil
-	} else {
-		return &st
-	}
-}
-
-func (self *StoredTask) Done(succ int, result string) {
-	self.Status = DONE
-	self.Succ = succ
-	self.Result = result
-	db.Update(self)
-}
-
-func (self *StoredTask) SetResult(result string) {
-	self.Result = result
-	db.Update(self)
-}
-
 // Task
 func (self *Task) ToAddTask() *AddTask {
 	return &AddTask{
-		Id:        self.Id,
+		ID:        self.ID,
 		Name:      self.Name,
 		Version:   self.Version,
 		Bind:      self.Bind,
@@ -271,7 +188,7 @@ func (self *Task) ToBuildTask() *BuildTask {
 
 func (self *Task) ToRemoveTask() *RemoveTask {
 	return &RemoveTask{
-		Id:        self.Id,
+		ID:        self.ID,
 		Name:      self.Name,
 		Version:   self.Version,
 		Container: self.Container,
@@ -304,8 +221,8 @@ func (self *LeviGroupedTask) Done() bool {
 	return self.Tasks != nil && self.Tasks.Done()
 }
 
-func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
-	appYaml, err := app.GetAppYaml()
+func AddContainerTask(av *AppVersion, host *Host, daemon bool) *Task {
+	appYaml, err := av.GetAppYaml()
 	if err != nil {
 		Logger.Debug("app.yaml error: ", err)
 		return nil
@@ -320,130 +237,128 @@ func AddContainerTask(app *Application, host *Host, daemon bool) *Task {
 	}
 
 	bind := 0
-	daemonId := ""
+	daemonID := ""
 	cmd := []string{}
 
 	if daemon {
 		bind = 0
-		daemonId = CreateRandomHexString(app.Name, 7)
+		daemonID = CreateRandomHexString(av.Name, 7)
 		cmd = strings.Split(appYaml.Daemon[0], " ")
 	} else {
 		bind = GetPortFromHost(host)
 		if bind == 0 {
 			return nil
 		}
-		daemonId = ""
+		daemonID = ""
 		cmd = strings.Split(appYaml.Cmd[0], " ")
 	}
 
-	st := NewStoredTask(app.Id, AddContainer)
-	if st == nil {
+	job := NewJob(av, ADDCONTAINER)
+	if job == nil {
 		Logger.Info("task not inserted")
 		return nil
 	}
 
 	return &Task{
-		Id:       st.Id,
-		Name:     strings.ToLower(app.Name),
-		Version:  app.Version,
+		ID:       job.ID,
+		Name:     strings.ToLower(av.Name),
+		Version:  av.Version,
 		Port:     appYaml.Port,
 		Cmd:      cmd,
 		Host:     host.IP,
-		Type:     AddContainer,
-		Uid:      app.UserUid(),
+		Type:     ADDCONTAINER,
+		Uid:      av.UserUID(),
 		Bind:     bind,
 		Memory:   config.Config.Task.Memory,
 		CpuShare: config.Config.Task.CpuShare,
 		CpuSet:   config.Config.Task.CpuSet,
-		Daemon:   daemonId,
+		Daemon:   daemonID,
 	}
 }
 
 func RemoveContainerTask(container *Container) *Task {
-	app := container.Application()
+	av := container.AppVersion()
 	host := container.Host()
-	if host == nil || app == nil {
-		return nil
-	}
-	rmImg := false
-	if cs := GetContainerByHostAndApp(host, app); len(cs) == 1 {
-		rmImg = true
-	}
-	if app == nil || host == nil {
+	if host == nil || av == nil {
 		return nil
 	}
 
-	st := NewStoredTask(app.Id, RemoveContainer)
-	if st == nil {
+	rmImg := false
+	if cs := GetContainerByHostAndAppVersion(host, av); len(cs) == 1 {
+		rmImg = true
+	}
+
+	job := NewJob(av, REMOVECONTAINER)
+	if job == nil {
 		Logger.Info("task not inserted")
 		return nil
 	}
 
 	return &Task{
-		Id:        st.Id,
-		Name:      strings.ToLower(app.Name),
-		Version:   app.Version,
+		ID:        job.ID,
+		Name:      strings.ToLower(av.Name),
+		Version:   av.Version,
 		Host:      host.IP,
-		Type:      RemoveContainer,
+		Type:      REMOVECONTAINER,
 		Uid:       0,
-		Container: container.ContainerId,
+		Container: container.ContainerID,
 		RmImage:   rmImg,
 	}
 }
 
-func UpdateContainerTask(container *Container, app *Application) *Task {
+func UpdateContainerTask(container *Container, av *AppVersion) *Task {
 	host := container.Host()
-	oldApp := container.Application()
-	if host == nil || oldApp == nil {
+	oav := container.AppVersion()
+	if host == nil || oav == nil {
 		return nil
 	}
-	appYaml, err := app.GetAppYaml()
+	appYaml, err := av.GetAppYaml()
 	if err != nil {
 		return nil
 	}
 	rmImg := false
-	if cs := GetContainerByHostAndApp(host, oldApp); len(cs) == 1 {
+	if cs := GetContainerByHostAndAppVersion(host, oav); len(cs) == 1 {
 		rmImg = true
 	}
 
 	bind := 0
-	daemonId := ""
+	daemonID := ""
 	cmd := []string{}
 
-	if container.IdentId != "" {
+	if container.IdentID != "" {
 		bind = 0
-		daemonId = CreateRandomHexString(app.Name, 7)
+		daemonID = CreateRandomHexString(av.Name, 7)
 		cmd = strings.Split(appYaml.Daemon[0], " ")
 	} else {
 		bind = GetPortFromHost(host)
 		if bind == 0 {
 			return nil
 		}
-		daemonId = ""
+		daemonID = ""
 		cmd = strings.Split(appYaml.Cmd[0], " ")
 	}
 
-	st := NewStoredTask(app.Id, UpdateContainer)
-	if st == nil {
+	job := NewJob(av, UPDATECONTAINER)
+	if job == nil {
 		Logger.Info("task not inserted")
 		return nil
 	}
 
 	return &Task{
-		Id:        st.Id,
-		Name:      strings.ToLower(app.Name),
-		Version:   app.Version,
+		ID:        job.ID,
+		Name:      strings.ToLower(av.Name),
+		Version:   av.Version,
 		Port:      appYaml.Port,
 		Cmd:       cmd,
 		Host:      host.IP,
-		Type:      UpdateContainer,
-		Uid:       app.UserUid(),
+		Type:      UPDATECONTAINER,
+		Uid:       av.UserUID(),
 		Bind:      bind,
 		Memory:    config.Config.Task.Memory,
 		CpuShare:  config.Config.Task.CpuShare,
 		CpuSet:    config.Config.Task.CpuSet,
-		Daemon:    daemonId,
-		Container: container.ContainerId,
+		Daemon:    daemonID,
+		Container: container.ContainerID,
 		RmImage:   rmImg,
 	}
 }
@@ -452,11 +367,15 @@ func UpdateContainerTask(container *Container, app *Application) *Task {
 // build任务的version就是应用的version, 都是7位的git版本号
 // build任务的build就是应用的build
 // 也就是告诉dot, 我需要用base来构建group下的app应用
-func BuildImageTask(app *Application, base string) *Task {
+func BuildImageTask(av *AppVersion, base string) *Task {
+	if av == nil {
+		return nil
+	}
+	app := GetApplication(av.Name)
 	if app == nil {
 		return nil
 	}
-	appYaml, err := app.GetAppYaml()
+	appYaml, err := av.GetAppYaml()
 	if err != nil {
 		Logger.Debug("app.yaml error: ", err)
 		return nil
@@ -465,16 +384,16 @@ func BuildImageTask(app *Application, base string) *Task {
 		Logger.Debug("build task error: need build in app.yaml")
 		return nil
 	}
-	st := NewStoredTask(app.Id, BuildImage)
-	if st == nil {
+	job := NewJob(av, BUILDIMAGE)
+	if job == nil {
 		Logger.Info("task not inserted")
 		return nil
 	}
 	buildTask := BuildTask{
-		Id:      st.Id,
+		ID:      job.ID,
 		Name:    app.Pname,
-		Version: app.Version,
-		Group:   app.Group,
+		Version: av.Version,
+		Group:   app.Namespace,
 		Base:    base,
 		Build:   appYaml.Build[0],
 		Static:  appYaml.Static,
@@ -482,20 +401,20 @@ func BuildImageTask(app *Application, base string) *Task {
 		done:    false,
 	}
 	return &Task{
-		Id:      st.Id,
-		Name:    strings.ToLower(app.Name),
-		Uid:     app.UserUid(),
-		Type:    BuildImage,
+		ID:      job.ID,
+		Name:    strings.ToLower(av.Name),
+		Uid:     av.UserUID(),
+		Type:    BUILDIMAGE,
 		Build:   buildTask,
-		Version: app.Version,
+		Version: av.Version,
 	}
 }
 
 // test task
-func TestApplicationTask(app *Application, host *Host) *Task {
-	testId := CreateRandomHexString(app.Name, 7)
+func TestApplicationTask(av *AppVersion, host *Host) *Task {
+	testID := CreateRandomHexString(av.Name, 7)
 
-	appYaml, err := app.GetAppYaml()
+	appYaml, err := av.GetAppYaml()
 	if err != nil {
 		Logger.Debug("app.yaml error: ", err)
 		return nil
@@ -506,23 +425,23 @@ func TestApplicationTask(app *Application, host *Host) *Task {
 	}
 	testCmd := strings.Split(appYaml.Test[0], " ")
 
-	st := NewStoredTask(app.Id, TestApplication)
-	if st == nil {
+	job := NewJob(av, TESTAPPLICATION)
+	if job == nil {
 		Logger.Info("task not inserted")
 		return nil
 	}
 	return &Task{
-		Id:       st.Id,
-		Name:     strings.ToLower(app.Name),
-		Version:  app.Version,
+		ID:       job.ID,
+		Name:     strings.ToLower(av.Name),
+		Version:  av.Version,
 		Port:     appYaml.Port,
 		Cmd:      testCmd,
 		Host:     host.IP,
-		Type:     TestApplication,
-		Uid:      app.UserUid(),
+		Type:     TESTAPPLICATION,
+		Uid:      av.UserUID(),
 		Bind:     0,
 		Memory:   config.Config.Task.Memory,
 		CpuShare: config.Config.Task.CpuShare,
 		CpuSet:   config.Config.Task.CpuSet,
-		Test:     testId}
+		Test:     testID}
 }
