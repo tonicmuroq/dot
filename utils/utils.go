@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -104,4 +105,12 @@ func CopyFiles(dst, src string, uid, gid int) error {
 		}
 		return err
 	})
+}
+
+func Atoi(s string, def int) int {
+	if r, err := strconv.Atoi(s); err != nil {
+		return def
+	} else {
+		return r
+	}
 }

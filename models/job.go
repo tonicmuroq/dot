@@ -19,15 +19,15 @@ const (
 )
 
 type Job struct {
-	ID         int `orm:"column(id);auto;pk"`
-	AppName    string
-	AppVersion string
-	Status     int // 对应状态, Running/Done
-	Succ       int // 成功/失败
-	Kind       int // 类型, Add/Remove/Update/Build/Test
-	Result     string
-	Created    time.Time `orm:"auto_now_add;type(datetime)"`
-	Finished   time.Time `orm:"auto_now;type(datetime)"`
+	ID         int       `orm:"column(id);auto;pk" json:"id"`
+	AppName    string    `json:"app_name"`
+	AppVersion string    `json:"app_version"`
+	Status     int       `json:"status"` // 对应状态, Running/Done
+	Succ       int       `json:"succ"`   // 成功/失败
+	Kind       int       `json:"kind"`   // 类型, Add/Remove/Update/Build/Test
+	Result     string    `json:"result"`
+	Created    time.Time `orm:"auto_now_add;type(datetime)" json:"created"`
+	Finished   time.Time `orm:"auto_now;type(datetime)" json:"Finished"`
 }
 
 func GetJob(id int) *Job {
@@ -55,6 +55,22 @@ func GetJobByAppAndRet(av *AppVersion, ret string) *Job {
 		return nil
 	}
 	return &j
+}
+
+func GetJobs(name, version string, status, succ, start, limit int) []*Job {
+	var jobs []*Job
+	query := db.QueryTable(new(Job)).Filter("AppName", name)
+	if version != "" {
+		query = query.Filter("AppVersion", version)
+	}
+	if status != -1 {
+		query = query.Filter("Status", status)
+	}
+	if succ != -1 {
+		query = query.Filter("Succ", succ)
+	}
+	query.OrderBy("-id").Limit(limit, start).All(&jobs)
+	return jobs
 }
 
 func (j *Job) Done(succ int, result string) {

@@ -3,13 +3,13 @@ package models
 import . "../utils"
 
 type Container struct {
-	ID          int `orm:"column(id);auto;pk"`
-	Port        int
-	ContainerID string `orm:"column(container_id)"`
-	IdentID     string `orm:"column(ident_id)"`
-	HostID      int    `orm:"column(host_id)"`
-	AppName     string
-	Version     string
+	ID          int    `orm:"column(id);auto;pk" json:"id"`
+	Port        int    `json:"port"`
+	ContainerID string `orm:"column(container_id)" json:"container_id"`
+	IdentID     string `orm:"column(ident_id)" json:"ident_id"`
+	HostID      int    `orm:"column(host_id)" json:"host_id"`
+	AppName     string `json:"app_name"`
+	Version     string `json:"version"`
 }
 
 func (c *Container) Application() *Application {
@@ -60,6 +60,22 @@ func GetContainerByCid(cid string) *Container {
 		return nil
 	}
 	return &container
+}
+
+func GetContainers(hostID int, appName, version string, start, limit int) []*Container {
+	var cs []*Container
+	query := db.QueryTable(new(Container))
+	if hostID != -1 {
+		query = query.Filter("HostID", hostID)
+	}
+	if appName != "" {
+		query = query.Filter("AppName", appName)
+	}
+	if version != "" {
+		query = query.Filter("Version", version)
+	}
+	query.OrderBy("AppName").Limit(limit, start).All(&cs)
+	return cs
 }
 
 func GetContainerByHostAndApp(host *Host, appname string) []*Container {
