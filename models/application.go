@@ -127,6 +127,7 @@ func GetVersionByID(id int) *AppVersion {
 	if err != nil {
 		return nil
 	}
+	v.AppYaml, _ = v.GetAppYaml()
 	return &v
 }
 
