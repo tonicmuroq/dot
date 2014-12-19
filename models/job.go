@@ -27,7 +27,7 @@ type Job struct {
 	Kind       int       `json:"kind"`   // 类型, Add/Remove/Update/Build/Test
 	Result     string    `json:"result"`
 	Created    time.Time `orm:"auto_now_add;type(datetime)" json:"created"`
-	Finished   time.Time `orm:"auto_now;type(datetime)" json:"Finished"`
+	Finished   time.Time `orm:"auto_now;type(datetime)" json:"finished"`
 }
 
 func GetJob(id int) *Job {
