@@ -389,6 +389,10 @@ func GetContainers(req *Request) interface{} {
 		req.URL.Query().Get("version"), req.Start, req.Limit)
 }
 
+func GetAppVersionByID(req *Request) interface{} {
+	return models.GetVersionByID(utils.Atoi(req.URL.Query().Get("id"), 0))
+}
+
 func init() {
 	RestServer = pat.New()
 
@@ -418,6 +422,7 @@ func init() {
 			"/app/:app/:version":            GetAppVersion,
 			"/app/:app/:version/jobs":       GetAppVersionJobs,
 			"/app/:app/:version/containers": GetAppVersionContainers,
+			"/appversion/:id":               GetAppVersionByID,
 			"/host/:id":                     GetHostByID,
 			"/hosts":                        GetAllHosts,
 			"/container/:cid":               GetContainerByCid,
