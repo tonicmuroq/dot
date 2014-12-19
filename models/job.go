@@ -69,7 +69,7 @@ func GetJobs(name, version string, status, succ, start, limit int) []*Job {
 	if succ != -1 {
 		query = query.Filter("Succ", succ)
 	}
-	query.OrderBy("-id").Limit(limit, start).All(&jobs)
+	query.OrderBy("-ID").Limit(limit, start).All(&jobs)
 	return jobs
 }
 

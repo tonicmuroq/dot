@@ -117,7 +117,7 @@ func GetVersion(appname, version string) *AppVersion {
 
 func GetVersions(appname string, start, limit int) []*AppVersion {
 	var vs []*AppVersion
-	db.QueryTable(new(AppVersion)).Filter("Name", appname).Limit(limit, start).All(&vs)
+	db.QueryTable(new(AppVersion)).Filter("Name", appname).OrderBy("-ID").Limit(limit, start).All(&vs)
 	return vs
 }
 
@@ -247,7 +247,7 @@ func (av *AppVersion) SetImageAddr(addr string) {
 
 func (a *Application) AllVersions(start, limit int) []*AppVersion {
 	var avs []*AppVersion
-	db.QueryTable(new(AppVersion)).Filter("Name", a.Name).Limit(limit, start).All(&avs)
+	db.QueryTable(new(AppVersion)).Filter("Name", a.Name).OrderBy("-ID").Limit(limit, start).All(&avs)
 	return avs
 }
 
