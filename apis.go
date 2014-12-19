@@ -390,7 +390,7 @@ func GetContainers(req *Request) interface{} {
 }
 
 func GetAppVersionByID(req *Request) interface{} {
-	return models.GetVersionByID(utils.Atoi(req.URL.Query().Get("id"), 0))
+	return models.GetVersionByID(utils.Atoi(req.URL.Query().Get(":id"), 0))
 }
 
 func init() {
