@@ -33,7 +33,7 @@ type AppVersion struct {
 	Name      string    `json:"name"`
 	Version   string    `json:"version"`
 	Created   time.Time `orm:"auto_now_add;type(datetime)" json:"created"`
-	ImageAddr string    `orm:"default("")" json:"image_addr"`
+	ImageAddr string    `json:"image_addr"`
 	AppYaml   *AppYaml  `orm:"-" json:"app.yaml"`
 }
 
