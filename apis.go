@@ -393,6 +393,18 @@ func GetAppVersionByID(req *Request) interface{} {
 	return models.GetVersionByID(utils.Atoi(req.URL.Query().Get(":id"), 0))
 }
 
+func GetJob(req *Request) interface{} {
+	return models.GetJob(utils.Atoi(req.URL.Query().Get(":id"), 0))
+}
+
+func GetJobs(req *Request) interface{} {
+	status := utils.Atoi(req.URL.Query().Get("status"), -1)
+	succ := utils.Atoi(req.URL.Query().Get("succ"), -1)
+	name := req.URL.Query().Get("name")
+	version := req.URL.Query().Get("version")
+	return models.GetJobs(name, version, status, succ, req.Start, req.Limit)
+}
+
 func init() {
 	RestServer = pat.New()
 
@@ -427,6 +439,8 @@ func init() {
 			"/hosts":                        GetAllHosts,
 			"/container/:cid":               GetContainerByCid,
 			"/containers":                   GetContainers,
+			"/jobs":                         GetJobs,
+			"/job/:id":                      GetJob,
 		},
 		"PUT": {
 			"/app/:app/branch": AppBranchHandler,
