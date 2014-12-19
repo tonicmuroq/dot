@@ -3,10 +3,10 @@ package models
 import "../config"
 
 type Host struct {
-	ID     int    `orm:"column(id);auto;pk"`
-	IP     string `orm:"column(ip)"`
-	Name   string
-	Status int
+	ID     int    `orm:"column(id);auto;pk" json:"id"`
+	IP     string `orm:"column(ip)" json:"ip"`
+	Name   string `json:"name"`
+	Status int    `json:"status"`
 }
 
 type Port struct {
@@ -43,6 +43,12 @@ func GetHostByIP(ip string) *Host {
 		return nil
 	}
 	return &host
+}
+
+func GetAllHosts(start, limit int) []*Host {
+	var hosts []*Host
+	db.QueryTable(new(Host)).Limit(limit, start).All(&hosts)
+	return hosts
 }
 
 func (h *Host) Online() {

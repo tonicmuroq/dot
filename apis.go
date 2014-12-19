@@ -3,6 +3,7 @@ package main
 import (
 	"./models"
 	"./resources"
+	"./utils"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,35 +21,38 @@ var (
 	NoSuchContainer = JSON{"r": 1, "msg": "no such container"}
 )
 
-func JSONWrapper(f func(*http.Request) JSON) func(http.ResponseWriter, *http.Request) {
+func JSONWrapper(f func(*Request) interface{}) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
-		req.ParseForm()
-		json.NewEncoder(w).Encode(f(req))
+		r := NewRequest(req)
+		json.NewEncoder(w).Encode(f(r))
 	}
 }
 
-func EchoHandler(req *http.Request) JSON {
+func EchoHandler(req *Request) interface{} {
 	msg := req.Form.Get("msg")
-	return JSON{"r": 0, "msg": msg}
+	return JSON{
+		"r":     0,
+		"msg":   msg,
+		"start": req.Start,
+		"limit": req.Limit,
+		"user":  req.User,
+	}
 }
 
-func RegisterApplicationHandler(req *http.Request) JSON {
+func RegisterApplicationHandler(req *Request) interface{} {
 	projectname := req.URL.Query().Get(":projectname")
 	version := req.URL.Query().Get(":version")
 	group := req.Form.Get("group")
 	appyaml := req.Form.Get("appyaml")
 
-	// user := req.Header.Get("NBE-User")
-	user := "NBEBot"
-
-	app := models.Register(projectname, version, group, appyaml, user)
+	app := models.Register(projectname, version, group, appyaml, req.User)
 	if app == nil {
 		return JSON{"r": 1, "msg": "register app fail"}
 	}
 	return JSON{"r": 0, "msg": "ok"}
 }
 
-func AddContainerHandler(req *http.Request) JSON {
+func AddContainerHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
@@ -71,7 +75,7 @@ func AddContainerHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
-func BuildImageHandler(req *http.Request) JSON {
+func BuildImageHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	// 暂时没有monitor, 那么人肉指定host吧
@@ -91,7 +95,7 @@ func BuildImageHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
-func TestImageHandler(req *http.Request) JSON {
+func TestImageHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	// 暂时没有monitor, 那么人肉指定host吧
@@ -110,7 +114,7 @@ func TestImageHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
-func DeployApplicationHandler(req *http.Request) JSON {
+func DeployApplicationHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ips := req.Form["hosts"]
@@ -131,7 +135,7 @@ func DeployApplicationHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok", "task_ids": taskIds}
 }
 
-func RemoveApplicationHandler(req *http.Request) JSON {
+func RemoveApplicationHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
@@ -148,7 +152,7 @@ func RemoveApplicationHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok", "task_ids": taskIds}
 }
 
-func UpdateApplicationHandler(req *http.Request) JSON {
+func UpdateApplicationHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	fromVersion := req.URL.Query().Get(":version")
 
@@ -168,7 +172,7 @@ func UpdateApplicationHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok", "task_ids": taskIds}
 }
 
-func RemoveContainerHandler(req *http.Request) JSON {
+func RemoveContainerHandler(req *Request) interface{} {
 	cid := req.URL.Query().Get(":cid")
 
 	container := models.GetContainerByCid(cid)
@@ -184,7 +188,7 @@ func RemoveContainerHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok", "task_id": task.ID}
 }
 
-func NewMySQLInstanceHandler(req *http.Request) JSON {
+func NewMySQLInstanceHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	mysqlName := req.Form.Get("name")
 	env := req.Form.Get("env")
@@ -221,7 +225,7 @@ func NewMySQLInstanceHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "", "mysql": mysql}
 }
 
-func NewRedisInstanceHandler(req *http.Request) JSON {
+func NewRedisInstanceHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	redisName := req.Form.Get("name")
 	env := req.Form.Get("env")
@@ -258,7 +262,7 @@ func NewRedisInstanceHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "", "redis": redis}
 }
 
-func RemoveResourceHandler(req *http.Request) JSON {
+func RemoveResourceHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	key := req.Form.Get("name")
 	env := req.Form.Get("env")
@@ -273,7 +277,7 @@ func RemoveResourceHandler(req *http.Request) JSON {
 	return JSON{"r": 0, "msg": "ok"}
 }
 
-func SyncDBHandler(req *http.Request) JSON {
+func SyncDBHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	schema := req.Form.Get("schema")
 
@@ -297,7 +301,7 @@ func SyncDBHandler(req *http.Request) JSON {
 	return r
 }
 
-func AppBranchHandler(req *http.Request) JSON {
+func AppBranchHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	if app := models.GetApplication(name); app == nil {
 		return NoSuchApp
@@ -320,10 +324,75 @@ func AppBranchHandler(req *http.Request) JSON {
 	return JSON{"r": 1, "msg": "method not allowed"}
 }
 
+func GetAllApplications(req *Request) interface{} {
+	return models.GetAllApplications(req.Start, req.Limit)
+}
+
+func GetApplication(req *Request) interface{} {
+	return models.GetApplication(req.URL.Query().Get(":app"))
+}
+
+func GetAppContainers(req *Request) interface{} {
+	app := models.GetApplication(req.URL.Query().Get(":app"))
+	if app == nil {
+		return []*models.Container{}
+	}
+	return app.Containers()
+}
+
+func GetAppVersions(req *Request) interface{} {
+	return models.GetVersions(req.URL.Query().Get(":app"), req.Start, req.Limit)
+}
+
+func GetAppJobs(req *Request) interface{} {
+	status := utils.Atoi(req.URL.Query().Get("status"), -1)
+	succ := utils.Atoi(req.URL.Query().Get("succ"), -1)
+	name := req.URL.Query().Get(":app")
+	return models.GetJobs(name, "", status, succ, req.Start, req.Limit)
+}
+
+func GetAppVersionJobs(req *Request) interface{} {
+	status := utils.Atoi(req.URL.Query().Get("status"), -1)
+	succ := utils.Atoi(req.URL.Query().Get("succ"), -1)
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+	return models.GetJobs(name, version, status, succ, req.Start, req.Limit)
+}
+
+func GetAppVersionContainers(req *Request) interface{} {
+	av := models.GetVersion(req.URL.Query().Get(":app"), req.URL.Query().Get(":version"))
+	if av == nil {
+		return []*models.Container{}
+	}
+	return av.Containers()
+}
+
+func GetAppVersion(req *Request) interface{} {
+	return models.GetVersion(req.URL.Query().Get(":app"), req.URL.Query().Get(":version"))
+}
+
+func GetHostByID(req *Request) interface{} {
+	return models.GetHostByID(utils.Atoi(req.URL.Query().Get(":id"), 0))
+}
+
+func GetAllHosts(req *Request) interface{} {
+	return models.GetAllHosts(req.Start, req.Limit)
+}
+
+func GetContainerByCid(req *Request) interface{} {
+	return models.GetContainerByCid(req.URL.Query().Get(":cid"))
+}
+
+func GetContainers(req *Request) interface{} {
+	hostID := utils.Atoi(req.URL.Query().Get("host_id"), -1)
+	return models.GetContainers(hostID, req.URL.Query().Get("name"),
+		req.URL.Query().Get("version"), req.Start, req.Limit)
+}
+
 func init() {
 	RestServer = pat.New()
 
-	rs := map[string]map[string]func(*http.Request) JSON{
+	rs := map[string]map[string]func(*Request) interface{}{
 		"POST": {
 			"/app/:projectname/:version":     RegisterApplicationHandler,
 			"/app/:app/:version/add":         AddContainerHandler,
@@ -339,8 +408,20 @@ func init() {
 			"/resource/:app/remove":          RemoveResourceHandler,
 		},
 		"GET": {
-			"/echo":            EchoHandler,
-			"/app/:app/branch": AppBranchHandler,
+			"/echo":                         EchoHandler,
+			"/app":                          GetAllApplications,
+			"/app/:app":                     GetApplication,
+			"/app/:app/branch":              AppBranchHandler,
+			"/app/:app/jobs":                GetAppJobs,
+			"/app/:app/containers":          GetAppContainers,
+			"/app/:app/versions":            GetAppVersions,
+			"/app/:app/:version":            GetAppVersion,
+			"/app/:app/:version/jobs":       GetAppVersionJobs,
+			"/app/:app/:version/containers": GetAppVersionContainers,
+			"/host/:id":                     GetHostByID,
+			"/hosts":                        GetAllHosts,
+			"/container/:cid":               GetContainerByCid,
+			"/containers":                   GetContainers,
 		},
 		"PUT": {
 			"/app/:app/branch": AppBranchHandler,

@@ -20,20 +20,21 @@ var (
 )
 
 type Application struct {
-	ID        int `orm:"auto;pk;column(id)"`
-	Name      string
-	Pname     string
-	Namespace string
-	User      *User       `orm:"rel(fk)"`
-	Manager   *ManagerSet `orm:"-"`
+	ID        int         `orm:"auto;pk;column(id)" json:"id"`
+	Name      string      `json:"name"`
+	Pname     string      `json:"pname"`
+	Namespace string      `json:"namespace"`
+	User      *User       `orm:"rel(fk)" json:"-"`
+	Manager   *ManagerSet `orm:"-" json:"-"`
 }
 
 type AppVersion struct {
-	ID        int `orm:"auto;pk;column(id)"`
-	Name      string
-	Version   string
-	Created   time.Time `orm:"auto_now_add;type(datetime)"`
-	ImageAddr string    `orm:"default("")"`
+	ID        int       `orm:"auto;pk;column(id)" json:"id"`
+	Name      string    `json:"name"`
+	Version   string    `json:"version"`
+	Created   time.Time `orm:"auto_now_add;type(datetime)" json:"created"`
+	ImageAddr string    `orm:"default("")" json:"image_addr"`
+	AppYaml   *AppYaml  `orm:"-" json:"app.yaml"`
 }
 
 type AppYaml struct {
@@ -98,13 +99,26 @@ func GetApplication(appname string) *Application {
 	return &app
 }
 
+func GetAllApplications(start, limit int) []*Application {
+	var apps []*Application
+	db.QueryTable(new(Application)).OrderBy("Name").Limit(limit, start).All(&apps)
+	return apps
+}
+
 func GetVersion(appname, version string) *AppVersion {
 	var v AppVersion
 	err := db.QueryTable(new(AppVersion)).Filter("Name", appname).Filter("Version", version).One(&v)
 	if err != nil {
 		return nil
 	}
+	v.AppYaml, _ = v.GetAppYaml()
 	return &v
+}
+
+func GetVersions(appname string, start, limit int) []*AppVersion {
+	var vs []*AppVersion
+	db.QueryTable(new(AppVersion)).Filter("Name", appname).Limit(limit, start).All(&vs)
+	return vs
 }
 
 func GetVersionByID(id int) *AppVersion {
@@ -230,15 +244,21 @@ func (av *AppVersion) SetImageAddr(addr string) {
 	db.Update(av)
 }
 
+func (a *Application) AllVersions(start, limit int) []*AppVersion {
+	var avs []*AppVersion
+	db.QueryTable(new(AppVersion)).Filter("Name", a.Name).Limit(limit, start).All(&avs)
+	return avs
+}
+
 func (a *Application) Containers() []*Container {
 	var cs []*Container
-	db.QueryTable(new(Container)).Filter("Name", a.Name).OrderBy("Port").All(&cs)
+	db.QueryTable(new(Container)).Filter("AppName", a.Name).OrderBy("Port").All(&cs)
 	return cs
 }
 
 func (av *AppVersion) Containers() []*Container {
 	var cs []*Container
-	db.QueryTable(new(Container)).Filter("Name", av.Name).Filter("Version", av.Version).OrderBy("Port").All(&cs)
+	db.QueryTable(new(Container)).Filter("AppName", av.Name).Filter("Version", av.Version).OrderBy("Port").All(&cs)
 	return cs
 }
 
