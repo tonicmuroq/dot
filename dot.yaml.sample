@@ -10,6 +10,7 @@ dbmgr:
     use: "mysql"
     url: "root:@/dot?charset=utf8"
 redismgr: "http://10.1.201.47"
+sentrymgr: "http://10.1.201.47:8000"
 etcd:
     sync: true
     machines:
