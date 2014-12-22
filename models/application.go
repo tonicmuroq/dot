@@ -198,7 +198,7 @@ func (a *Application) CreateDNS() error {
 	dns := map[string]string{
 		"host": config.Config.Masteraddr,
 	}
-	p := path.Join("/skydns/com/hunantv/intra", a.Name)
+	p := path.Join(config.Config.DNSSuffix, a.Name)
 	_, err := etcdClient.Create(p, "", 0)
 	if err != nil {
 		return err
