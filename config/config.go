@@ -48,6 +48,7 @@ type DotConfig struct {
 	Pidfile    string
 	Masteraddr string
 	Redismgr   string
+	Sentrymgr  string
 	Minport    int
 	Maxport    int
 	DNSSuffix  string `yaml:"dns_suffix"`

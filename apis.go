@@ -262,6 +262,27 @@ func NewRedisInstanceHandler(req *Request) interface{} {
 	return JSON{"r": 0, "msg": "", "redis": redis}
 }
 
+func NewSentryDSNHandler(req *Request) interface{} {
+	name := req.URL.Query().Get(":app")
+	platform := req.Form.Get("platform")
+
+	if platform == "" {
+		return JSON{"r": 1, "msg": "no platform defined"}
+	}
+	if app := models.GetApplication(name); app == nil {
+		return NoSuchApp
+	}
+	sentry, err := resources.NewSentryDSN(name, platform)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "sentry": nil}
+	}
+	err = models.AppendResource(name, "prod", "sentry", sentry)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "sentry": nil}
+	}
+	return JSON{"r": 0, "msg": "", "sentry": sentry}
+}
+
 func RemoveResourceHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	key := req.Form.Get("name")
@@ -421,6 +442,7 @@ func init() {
 			"/resource/:app/mysql":           NewMySQLInstanceHandler,
 			"/resource/:app/:version/syncdb": SyncDBHandler,
 			"/resource/:app/redis":           NewRedisInstanceHandler,
+			"/resource/:app/sentry":          NewSentryDSNHandler,
 			"/resource/:app/remove":          RemoveResourceHandler,
 		},
 		"GET": {
