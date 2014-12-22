@@ -50,6 +50,7 @@ type DotConfig struct {
 	Redismgr   string
 	Minport    int
 	Maxport    int
+	DNSSuffix  string `yaml:"dns_suffix"`
 
 	Db    DbConfig
 	Dbmgr DbConfig
