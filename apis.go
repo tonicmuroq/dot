@@ -276,7 +276,12 @@ func NewSentryDSNHandler(req *Request) interface{} {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "sentry": nil}
 	}
-	err = models.AppendResource(name, "prod", "sentry", sentry)
+	dsn, ok := sentry["dsn"].(string)
+	if !ok {
+		return JSON{"r": 1, "msg": "sentry not string", "sentry": nil}
+	}
+	// sentry 是 {"dsn": "udp://xxxx:yyyy@host:port/namespace"}
+	err = models.AppendResource(name, "prod", "sentry_dsn", dsn)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "sentry": nil}
 	}

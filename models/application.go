@@ -281,7 +281,7 @@ func resourceKey(name, env string) string {
 	return path.Join(AppPathPrefix, name, fmt.Sprintf("resource-%s", env))
 }
 
-func resource(name, env string) map[string]map[string]interface{} {
+func resource(name, env string) map[string]interface{} {
 	p := resourceKey(name, env)
 	if p == "" {
 		return nil
@@ -293,12 +293,12 @@ func resource(name, env string) map[string]map[string]interface{} {
 	if r.Node.Dir {
 		return nil
 	}
-	var d map[string]map[string]interface{}
+	var d map[string]interface{}
 	YAMLDecode(r.Node.Value, &d)
 	return d
 }
 
-func (a *Application) Resource(env string) map[string]map[string]interface{} {
+func (a *Application) Resource(env string) map[string]interface{} {
 	return resource(a.Name, env)
 }
 
@@ -307,8 +307,12 @@ func (a *Application) MySQLDSN(env, key string) string {
 	if r == nil {
 		return ""
 	}
-	mysql, exists := r[key]
+	value, exists := r[key]
 	if !exists {
+		return ""
+	}
+	mysql, ok := value.(map[string]interface{})
+	if !ok {
 		return ""
 	}
 	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
@@ -340,14 +344,14 @@ func GetHookBranch(name string) (string, error) {
 	return r.Node.Value, nil
 }
 
-func AppendResource(name, env, key string, res map[string]interface{}) error {
+func AppendResource(name, env, key string, res interface{}) error {
 	p := resourceKey(name, env)
 	if p == "" {
 		return NoKeyFound
 	}
 	r := resource(name, env)
 	if r == nil {
-		r = make(map[string]map[string]interface{})
+		r = make(map[string]interface{})
 	}
 	_, exists := r[key]
 	if exists {
