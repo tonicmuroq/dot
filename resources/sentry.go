@@ -4,7 +4,6 @@ import (
 	"../config"
 	"../models"
 	"fmt"
-	"net/url"
 )
 
 func NewSentryDSN(appname, platform string) (map[string]interface{}, error) {
@@ -12,11 +11,7 @@ func NewSentryDSN(appname, platform string) (map[string]interface{}, error) {
 	if app == nil {
 		return nil, fmt.Errorf("No application %s found", appname)
 	}
-	data := url.Values{
-		"team":     []string{app.Namespace},
-		"platform": []string{platform},
-		"project":  []string{appname},
-	}
-	u := fmt.Sprintf("%s/register_dsn", config.Config.Sentrymgr)
-	return Post(u, data)
+	u := fmt.Sprintf("%s/register_dsn/%s/%s/%s", config.Config.Sentrymgr,
+		app.Namespace, platform, appname)
+	return Get(u)
 }
