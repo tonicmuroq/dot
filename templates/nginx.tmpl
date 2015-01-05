@@ -8,6 +8,9 @@ server {
     listen 80;
     server_name {{.Name}}.intra.hunantv.com;
 
+    underscores_in_headers on;
+    ignore_invalid_headers off;
+
     # error_page 400 402 403 404 /40x.html;
     # error_page 500 502 503 504 /50x.html;
 
@@ -21,9 +24,11 @@ server {
         break;
     }
 
-    location ~ \.(js|css|jpg|png)$ {
+    {{if .Static}}
+    location ^~ {{.Static}} {
         root {{.Path}};
     }
+    {{end}}
 
     # location ~* (40x.html|50x.html)$ {
     #     internal;

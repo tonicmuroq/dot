@@ -231,6 +231,14 @@ func (av *AppVersion) GetAppYaml() (*AppYaml, error) {
 	return &appYaml, nil
 }
 
+func (av *AppVersion) StaticPath() string {
+	appYaml, err := av.GetAppYaml()
+	if err != nil {
+		return ""
+	}
+	return appYaml.Static
+}
+
 func (av *AppVersion) UserUID() int {
 	app := GetApplication(av.Name)
 	return app.UserUID()
