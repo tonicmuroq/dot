@@ -24,7 +24,7 @@ server {
         break;
     }
 
-    {{if .Static}}
+    {{if ne .Static "/"}}
     location ^~ {{.Static}} {
         root {{.Path}};
     }
