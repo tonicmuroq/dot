@@ -43,13 +43,6 @@ type InfluxdbConfig struct {
 	Password string
 }
 
-type DbaConfig struct {
-	Sysuid string
-	Syspwd string
-	Bcode  string
-	Addr   string
-}
-
 type DotConfig struct {
 	Bind       string
 	Pidfile    string
@@ -65,7 +58,6 @@ type DotConfig struct {
 	Etcd     EtcdConfig
 	Task     TaskConfig
 	Nginx    NginxConfig
-	Dba      DbaConfig
 	Influxdb InfluxdbConfig
 }
 
