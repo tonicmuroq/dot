@@ -11,7 +11,7 @@ import (
 func NewInfluxdb(appname string) (map[string]interface{}, error) {
 	password := utils.CreateSha1HexValue([]byte(appname + time.Now().String()))[:8]
 	client, err := client.NewClient(&client.ClientConfig{
-		Host:     fmt.Sprintf("%s:%s", config.Config.Influxdb.Host, config.Config.Influxdb.Port),
+		Host:     fmt.Sprintf("%v:%v", config.Config.Influxdb.Host, config.Config.Influxdb.Port),
 		Username: config.Config.Influxdb.Username,
 		Password: config.Config.Influxdb.Password,
 		IsSecure: false,
