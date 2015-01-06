@@ -36,11 +36,11 @@ type NginxConfig struct {
 	Port         int
 }
 
-type DbaConfig struct {
-	Sysuid string
-	Syspwd string
-	Bcode  string
-	Addr   string
+type InfluxdbConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
 }
 
 type DotConfig struct {
@@ -53,12 +53,12 @@ type DotConfig struct {
 	Maxport    int
 	DNSSuffix  string `yaml:"dns_suffix"`
 
-	Db    DbConfig
-	Dbmgr DbConfig
-	Etcd  EtcdConfig
-	Task  TaskConfig
-	Nginx NginxConfig
-	Dba   DbaConfig
+	Db       DbConfig
+	Dbmgr    DbConfig
+	Etcd     EtcdConfig
+	Task     TaskConfig
+	Nginx    NginxConfig
+	Influxdb InfluxdbConfig
 }
 
 var Config = DotConfig{}
