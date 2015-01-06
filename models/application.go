@@ -118,6 +118,9 @@ func GetVersion(appname, version string) *AppVersion {
 func GetVersions(appname string, start, limit int) []*AppVersion {
 	var vs []*AppVersion
 	db.QueryTable(new(AppVersion)).Filter("Name", appname).OrderBy("-ID").Limit(limit, start).All(&vs)
+	for _, v := range vs {
+		v.AppYaml, _ = v.GetAppYaml()
+	}
 	return vs
 }
 
