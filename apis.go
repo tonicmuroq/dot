@@ -288,6 +288,27 @@ func NewSentryDSNHandler(req *Request) interface{} {
 	return JSON{"r": 0, "msg": "", "sentry": sentry}
 }
 
+func NewInfluxdbHanlder(req *Request) interface{} {
+	name := req.URL.Query().Get(":app")
+	app := models.GetApplication(name)
+	if app == nil {
+		return NoSuchApp
+	}
+	resource := app.Resource("prod")
+	if influxdb, exists := resource["influxdb"]; exists {
+		return JSON{"r": 1, "msg": "already has one", "influxdb": influxdb}
+	}
+	influxdb, err := resources.NewInfluxdb(name)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "influxdb": nil}
+	}
+	err = models.AppendResource(name, "prod", "influxdb", influxdb)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error(), "influxdb": nil}
+	}
+	return JSON{"r": 0, "msg": "ok", "influxdb": influxdb}
+}
+
 func RemoveResourceHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	key := req.Form.Get("name")
@@ -448,6 +469,7 @@ func init() {
 			"/resource/:app/:version/syncdb": SyncDBHandler,
 			"/resource/:app/redis":           NewRedisInstanceHandler,
 			"/resource/:app/sentry":          NewSentryDSNHandler,
+			"/resource/:app/influxdb":        NewInfluxdbHanlder,
 			"/resource/:app/remove":          RemoveResourceHandler,
 		},
 		"GET": {
