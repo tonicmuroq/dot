@@ -288,15 +288,15 @@ func NewSentryDSNHandler(req *Request) interface{} {
 	return JSON{"r": 0, "msg": "", "sentry": sentry}
 }
 
-func NewInfluxdbHanlder(req *Request) interface{} {
+func NewInfluxdbHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	app := models.GetApplication(name)
 	if app == nil {
 		return NoSuchApp
 	}
 	resource := app.Resource("prod")
-	if influxdb, exists := resource["influxdb"]; exists {
-		return JSON{"r": 1, "msg": "already has one", "influxdb": influxdb}
+	if _, exists := resource["influxdb"]; exists {
+		return JSON{"r": 1, "msg": "already has one", "influxdb": nil}
 	}
 	influxdb, err := resources.NewInfluxdb(name)
 	if err != nil {
@@ -469,7 +469,7 @@ func init() {
 			"/resource/:app/:version/syncdb": SyncDBHandler,
 			"/resource/:app/redis":           NewRedisInstanceHandler,
 			"/resource/:app/sentry":          NewSentryDSNHandler,
-			"/resource/:app/influxdb":        NewInfluxdbHanlder,
+			"/resource/:app/influxdb":        NewInfluxdbHandler,
 			"/resource/:app/remove":          RemoveResourceHandler,
 		},
 		"GET": {
