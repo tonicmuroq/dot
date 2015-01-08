@@ -326,7 +326,7 @@ func (a *Application) MySQLDSN(env, key string) string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("%v@%v@tcp(%v:%v)/%v?autocommit=true",
+	return fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?autocommit=true",
 		mysql["username"], mysql["password"], mysql["host"], mysql["port"], mysql["db"])
 }
 
