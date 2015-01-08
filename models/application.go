@@ -322,7 +322,7 @@ func (a *Application) MySQLDSN(env, key string) string {
 	if !exists {
 		return ""
 	}
-	mysql, ok := value.(map[string]interface{})
+	mysql, ok := value.(map[interface{}]interface{})
 	if !ok {
 		return ""
 	}
