@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
+	"strings"
 	"time"
 )
 
@@ -48,9 +49,23 @@ func SyncSchema(dsn, schema string) error {
 	if err != nil {
 		return err
 	}
-	_, err = conn.Exec(schema)
-	if err != nil {
-		return err
+
+	lines := strings.Split(schema, "\n")
+	statements := []string{}
+	for _, line := range lines {
+		k := strings.TrimSpace(line)
+		if k == "" || strings.HasPrefix(k, "/*") || strings.HasPrefix(k, "--") {
+			continue
+		}
+		statements = append(statements, line)
+		if strings.HasSuffix(line, ";") {
+			statement := strings.Join(statements, "")
+			_, err := conn.Exec(statement)
+			if err != nil {
+				return err
+			}
+			statements = []string{}
+		}
 	}
 	return nil
 }
