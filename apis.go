@@ -331,12 +331,12 @@ func SyncDBHandler(req *Request) interface{} {
 	r := JSON{"r": 1, "msg": ""}
 	app := models.GetApplication(name)
 	if app == nil {
-		r["msg"] = fmt.Sprintf("app %s, %s not found", name)
+		r["msg"] = fmt.Sprintf("app %s not found", name)
 		return r
 	}
 	dsn := app.MySQLDSN("prod", "mysql")
 	if dsn == "" {
-		r["msg"] = fmt.Sprintf("app %s, %s has no dsn", name)
+		r["msg"] = fmt.Sprintf("app %s has no dsn", name)
 		return r
 	}
 	err := resources.SyncSchema(dsn, schema)
