@@ -52,6 +52,7 @@ type DotConfig struct {
 	Minport    int
 	Maxport    int
 	DNSSuffix  string `yaml:"dns_suffix"`
+	PodName    string `yaml:"podname"`
 
 	Db       DbConfig
 	Dbmgr    DbConfig
