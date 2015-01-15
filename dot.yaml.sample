@@ -1,6 +1,10 @@
 bind: "localhost:5000"
 pidfile: "/var/run/dot.pid"
 dns_suffix: "/skydns/com/hunantv/intra"
+masteraddr: "10.1.201.99"
+minport: 49000
+maxport: 49100
+podname: "intra"
 db:
     name: "default"
     use: "mysql"
@@ -30,8 +34,8 @@ nginx:
     port: 80
     staticdir: "/root/"
     staticsrcdir: "/mnt/mfs/"
-dba:
-    sysuid: "CreateDbUser"
-    syspwd: "CreateDbUser"
-    bcode: "AutoUpdate"
-    addr: "http://192.168.8.213:8088/CreateDatabase.aspx"
+influxdb:
+    host: localhost
+    port: 8086
+    username: username
+    password: password

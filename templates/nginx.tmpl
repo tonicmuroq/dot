@@ -6,7 +6,7 @@ upstream {{.Name}} {
 
 server {
     listen 80;
-    server_name {{.Name}}.intra.hunantv.com;
+    server_name {{.Name}}.{{.PodName}}.hunantv.com;
 
     underscores_in_headers on;
     ignore_invalid_headers off;
