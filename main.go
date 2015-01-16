@@ -12,7 +12,7 @@ import (
 	. "./utils"
 )
 
-var version = "Dot Version 0.2.0 (fix pod name)"
+var version = "Dot Version 0.2.0 (fix pod name 2014.01.16)"
 
 func main() {
 
