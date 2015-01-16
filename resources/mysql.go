@@ -25,12 +25,14 @@ func NewMySQLInstance(dbname, username string) (map[string]interface{}, error) {
 	password := utils.CreateSha1HexValue([]byte(username + time.Now().String()))[:8]
 	_, err = db.Raw(fmt.Sprintf("CREATE DATABASE `%s`", dbname)).Exec()
 	if err != nil {
+		utils.Logger.Info("create error, ", err)
 		return nil, CreateError
 	}
 
 	_, err = db.Raw(fmt.Sprintf("GRANT DROP, CREATE, ALTER, SELECT, INSERT, "+
 		"UPDATE, DELETE ON `%s`.* TO '%s'@'%%' IDENTIFIED BY '%s'", username, username, password)).Exec()
 	if err != nil {
+		utils.Logger.Info("grant error, ", err)
 		return nil, GrantError
 	}
 
