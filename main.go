@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,7 +12,15 @@ import (
 	. "./utils"
 )
 
+var version = "Dot Version 0.2.0 (fix pod name 2014.01.16)"
+
 func main() {
+
+	if len(os.Args) >= 2 && os.Args[1] == "version" {
+		fmt.Println(version)
+		os.Exit(0)
+	}
+
 	config.LoadConfig()
 	models.LoadStore()
 
