@@ -4,6 +4,10 @@ import (
 	"log"
 )
 
+func init() {
+	log.SetPrefix("Dot ")
+}
+
 var Logger *DotLogger = &DotLogger{}
 
 type DotLogger struct {
