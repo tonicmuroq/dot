@@ -58,12 +58,13 @@ func (self *Hub) CheckAlive() {
 			duration := time.Since(last)
 			// 如果一个连接不再存在, 那么删掉这个连接
 			if duration.Seconds() > float64(checkAliveDuration) {
-				Logger.Info(host, " is disconnected.")
+				Logger.Info(" disconnected: ", host)
 				self.RemoveLevi(host)
 			}
 		}
 		for host, levi := range self.levis {
 			levi.conn.Ping([]byte(host))
+			Logger.Info(" check alive: ", host)
 		}
 		time.Sleep(checkAliveDuration)
 	}
