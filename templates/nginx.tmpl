@@ -16,7 +16,7 @@ server {
 
     rewrite ^/(.*)/favicon.ico$ /favicon.ico last;
 
-    access_log  /mnt/mfs/logs/nbe/master/{{.Name}}-access.log  nbe;
+    access_log  /mnt/mfs/logs/nbe/master/{{.Name}}-access.log main;
     error_log   /mnt/mfs/logs/nbe/master/{{.Name}}-error.log error;
 
     location ~* (favicon.ico) {
