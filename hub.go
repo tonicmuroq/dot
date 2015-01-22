@@ -229,8 +229,9 @@ func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 	ws.SetReadLimit(maxMessageSize)
 	ws.SetReadDeadline(ZeroTime)
 	ws.SetWriteDeadline(ZeroTime)
-	ws.SetPongHandler(func(string) error {
+	ws.SetPongHandler(func(s string) error {
 		hub.lastCheckTime[host] = time.Now()
+		Logger.Info("Connection pong: ", s, " from host: ", host)
 		return nil
 	})
 	c := &Connection{ws: ws, host: host, port: port, closed: false}
