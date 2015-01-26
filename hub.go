@@ -131,6 +131,10 @@ func (self *Hub) RestartNginx() {
 				continue
 			}
 			for _, container := range containers {
+				if container.Port == 0 {
+					// ignore daemon
+					continue
+				}
 				upStream := fmt.Sprintf("%s:%v", container.Host().IP, container.Port)
 				data.UpStreams = append(data.UpStreams, upStream)
 			}
