@@ -104,24 +104,24 @@ func (self *Hub) RestartNginx() {
 			continue
 		}
 
+		containers := models.GetContainers(-1, av.Name, "", 0, 1000)
+
 		conf := path.Join(config.Config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
 		var data = struct {
-			Name    string
-			PodName string
-			Static  string
-			Path    string
-			Hosts   []string
+			Name      string
+			PodName   string
+			Static    string
+			Path      string
+			UpStreams []string
 		}{
-			Name:    app.Name,
-			PodName: config.Config.PodName,
-			Static:  path.Join("/", av.StaticPath()),
-			Path:    path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", av.Name, av.Version)),
-			Hosts:   []string{},
+			Name:      app.Name,
+			PodName:   config.Config.PodName,
+			Static:    path.Join("/", av.StaticPath()),
+			Path:      path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", av.Name, av.Version)),
+			UpStreams: []string{},
 		}
 
-		hosts := app.AllVersionHosts()
-
-		if len(hosts) == 0 {
+		if len(containers) == 0 {
 			EnsureFileAbsent(conf)
 		} else {
 			f, err := os.Create(conf)
@@ -130,9 +130,9 @@ func (self *Hub) RestartNginx() {
 				Logger.Info("Create nginx conf failed", err)
 				continue
 			}
-			for _, host := range hosts {
-				hostStr := fmt.Sprintf("%s:%v", host.IP, config.Config.Nginx.Port)
-				data.Hosts = append(data.Hosts, hostStr)
+			for _, container := range containers {
+				upStream := fmt.Sprintf("%s:%v", container.Host().IP, container.Port)
+				data.UpStreams = append(data.UpStreams, upStream)
 			}
 			tmpl := template.Must(template.ParseFiles(config.Config.Nginx.Template))
 			if err := tmpl.Execute(f, data); err != nil {
