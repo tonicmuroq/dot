@@ -1,7 +1,8 @@
 upstream {{.Name}} {
-{{range $host := .Hosts}}
-    server {{$host}} max_fails=1 fail_timeout=1s;
+{{range $upStream:= .UpStreams}}
+    server {{$upStream}} max_fails=1 fail_timeout=1s;
 {{end}}
+    keepalive 16;
 }
 
 server {
