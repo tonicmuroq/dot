@@ -121,8 +121,11 @@ func (self *Hub) RestartNginx() {
 			UpStreams: []string{},
 		}
 
+		remoteConfig := fmt.Sprintf("/etc/nginx/conf.d/%s.conf", av.Name)
+
 		if len(containers) == 0 {
 			EnsureFileAbsent(conf)
+			exec.Command("res", "nginx_clean", remoteConfig).Run()
 		} else {
 			f, err := os.Create(conf)
 			defer f.Close()
@@ -142,6 +145,7 @@ func (self *Hub) RestartNginx() {
 			if err := tmpl.Execute(f, data); err != nil {
 				Logger.Info("Render nginx conf failed", err)
 			}
+			exec.Command("res", "nginx_reload", conf, remoteConfig).Run()
 		}
 
 		app.CreateDNS()
