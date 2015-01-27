@@ -150,6 +150,7 @@ func (self *Hub) RestartNginx() {
 			}
 			if err := exec.Command("res", "nginx_reload", conf, remoteConfig).Run(); err != nil {
 				Logger.Info("res", "nginx_reload", conf, remoteConfig)
+				Logger.Info(err)
 			}
 		}
 
