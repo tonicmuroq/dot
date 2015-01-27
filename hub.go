@@ -125,7 +125,10 @@ func (self *Hub) RestartNginx() {
 
 		if len(containers) == 0 {
 			EnsureFileAbsent(conf)
-			exec.Command("res", "nginx_clean", remoteConfig).Run()
+			if err := exec.Command("res", "nginx_clean", remoteConfig).Run(); err != nil {
+				Logger.Info("res", "nginx_clean", remoteConfig)
+				Logger.Info(err)
+			}
 		} else {
 			f, err := os.Create(conf)
 			defer f.Close()
@@ -145,7 +148,9 @@ func (self *Hub) RestartNginx() {
 			if err := tmpl.Execute(f, data); err != nil {
 				Logger.Info("Render nginx conf failed", err)
 			}
-			exec.Command("res", "nginx_reload", conf, remoteConfig).Run()
+			if err := exec.Command("res", "nginx_reload", conf, remoteConfig).Run(); err != nil {
+				Logger.Info("res", "nginx_reload", conf, remoteConfig)
+			}
 		}
 
 		app.CreateDNS()
