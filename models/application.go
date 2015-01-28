@@ -14,6 +14,7 @@ import (
 var (
 	AppPathPrefix       = "/NBE/"
 	ShouldNotBeDIR      = errors.New("should not be dir")
+	ShouldBeDIR         = errors.New("should be dir")
 	NoKeyFound          = errors.New("no key found")
 	NoResourceFound     = errors.New("no resource found")
 	AlreadyHaveResource = errors.New("already have this resource")
@@ -254,6 +255,51 @@ func (a *Application) UserUID() int {
 func (av *AppVersion) SetImageAddr(addr string) {
 	av.ImageAddr = addr
 	db.Update(av)
+}
+
+func (av *AppVersion) AddAppYaml(name, yaml string) {
+	key := path.Join(AppPathPrefix, av.Name, av.Version, "sub", fmt.Sprintf("%s.yaml", name))
+	etcdClient.Create(key, "", 0)
+	etcdClient.Set(key, yaml, 0)
+}
+
+func (av *AppVersion) GetSubAppYaml(name string) (*AppYaml, error) {
+	if name == "" {
+		return av.GetAppYaml()
+	}
+	var appYaml AppYaml
+	key := path.Join(AppPathPrefix, av.Name, av.Version, "sub", fmt.Sprintf("%s.yaml", name))
+	r, err := etcdClient.Get(key, false, false)
+	if err != nil {
+		return nil, err
+	}
+	if r.Node.Dir {
+		return nil, ShouldNotBeDIR
+	}
+	if err := YAMLDecode(r.Node.Value, &appYaml); err != nil {
+		return nil, err
+	}
+	return &appYaml, nil
+}
+
+func (av *AppVersion) ListSubAppYamls() ([]*AppYaml, error) {
+	var ays []*AppYaml
+	dir := path.Join(AppPathPrefix, av.Name, av.Version, "sub")
+	r, err := etcdClient.Get(dir, false, false)
+	if err != nil {
+		return ays, err
+	}
+	if !r.Node.Dir {
+		return ays, ShouldBeDIR
+	}
+	for _, node := range r.Node.Nodes {
+		var appYaml AppYaml
+		if err := YAMLDecode(node.Value, &appYaml); err != nil {
+			continue
+		}
+		ays = append(ays, &appYaml)
+	}
+	return ays, nil
 }
 
 func (a *Application) AllVersions(start, limit int) []*AppVersion {

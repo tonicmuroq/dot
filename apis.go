@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/bmizerany/pat"
 )
@@ -372,6 +373,40 @@ func AppBranchHandler(req *Request) interface{} {
 	return JSON{"r": 1, "msg": "method not allowed"}
 }
 
+func AddSubAppYamlHandler(req *Request) interface{} {
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+	appyaml := req.Form.Get("appyaml")
+	av := models.GetVersion(name, version)
+	if av == nil {
+		return NoSuchApp
+	}
+	var yaml models.AppYaml
+	if err := utils.YAMLDecode(appyaml, &yaml); err != nil {
+		return JSON{"r": 1, "msg": "not valid yaml file"}
+	}
+	mainYaml, _ := av.GetAppYaml()
+	if mainYaml == nil {
+		return JSON{"r": 1, "msg": "no yaml found"}
+	}
+	if !strings.HasPrefix(yaml.Appname, mainYaml.Appname) {
+		return JSON{"r": 1, "msg": "must has the same prefix"}
+	}
+	av.AddAppYaml(yaml.Appname, appyaml)
+	return JSON{"r": 0, "msg": "ok"}
+}
+
+func ListSubAppYamlHandler(req *Request) interface{} {
+	name := req.URL.Query().Get(":app")
+	version := req.URL.Query().Get(":version")
+	av := models.GetVersion(name, version)
+	if av == nil {
+		return NoSuchApp
+	}
+	ays, _ := av.ListSubAppYamls()
+	return ays
+}
+
 func GetAllApplications(req *Request) interface{} {
 	return models.GetAllApplications(req.Start, req.Limit)
 }
@@ -458,20 +493,21 @@ func init() {
 
 	rs := map[string]map[string]func(*Request) interface{}{
 		"POST": {
-			"/app/:projectname/:version": RegisterApplicationHandler,
-			"/app/:app/:version/add":     AddContainerHandler,
-			"/app/:app/:version/build":   BuildImageHandler,
-			"/app/:app/:version/test":    TestImageHandler,
-			"/app/:app/:version/deploy":  DeployApplicationHandler,
-			"/app/:app/:version/update":  UpdateApplicationHandler,
-			"/app/:app/:version/remove":  RemoveApplicationHandler,
-			"/container/:cid/remove":     RemoveContainerHandler,
-			"/resource/:app/mysql":       NewMySQLInstanceHandler,
-			"/resource/:app/syncdb":      SyncDBHandler,
-			"/resource/:app/redis":       NewRedisInstanceHandler,
-			"/resource/:app/sentry":      NewSentryDSNHandler,
-			"/resource/:app/influxdb":    NewInfluxdbHandler,
-			"/resource/:app/remove":      RemoveResourceHandler,
+			"/app/:projectname/:version":    RegisterApplicationHandler,
+			"/app/:app/:version/add":        AddContainerHandler,
+			"/app/:app/:version/build":      BuildImageHandler,
+			"/app/:app/:version/test":       TestImageHandler,
+			"/app/:app/:version/deploy":     DeployApplicationHandler,
+			"/app/:app/:version/update":     UpdateApplicationHandler,
+			"/app/:app/:version/remove":     RemoveApplicationHandler,
+			"/app/:app/:version/subappyaml": AddSubAppYamlHandler,
+			"/container/:cid/remove":        RemoveContainerHandler,
+			"/resource/:app/mysql":          NewMySQLInstanceHandler,
+			"/resource/:app/syncdb":         SyncDBHandler,
+			"/resource/:app/redis":          NewRedisInstanceHandler,
+			"/resource/:app/sentry":         NewSentryDSNHandler,
+			"/resource/:app/influxdb":       NewInfluxdbHandler,
+			"/resource/:app/remove":         RemoveResourceHandler,
 		},
 		"GET": {
 			"/echo":                                EchoHandler,
@@ -484,6 +520,7 @@ func init() {
 			"/appversion/:app/:version":            GetAppVersion,
 			"/appversion/:app/:version/jobs":       GetAppVersionJobs,
 			"/appversion/:app/:version/containers": GetAppVersionContainers,
+			"/appversion/:app/:version/subappyaml": ListSubAppYamlHandler,
 			"/appversion/:id":                      GetAppVersionByID,
 			"/host/:id":                            GetHostByID,
 			"/hosts":                               GetAllHosts,
