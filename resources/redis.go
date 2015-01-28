@@ -4,11 +4,14 @@ import (
 	"../config"
 	"fmt"
 	"net/url"
+	"strconv"
+	"strings"
 )
 
 func NewRedisInstance(appname string) (map[string]interface{}, error) {
-	u := fmt.Sprintf("%s/start/%s", config.Config.Redismgr, appname)
-	return Post(u, url.Values{})
+	rs := strings.Split(config.Config.Redismgr, ":")
+	port, _ := strconv.Atoi(rs[1])
+	return map[string]interface{}{"host": rs[0], "port": port}, nil
 }
 
 func ExpandRedisInstance(appname string) (map[string]interface{}, error) {
