@@ -13,7 +13,7 @@ dbmgr:
     name: "mgr"
     use: "mysql"
     url: "root:@/dot?charset=utf8"
-redismgr: "http://10.1.201.47"
+redismgr: "10.1.201.47:8889"
 sentrymgr: "http://10.1.201.47:8000"
 etcd:
     sync: true
