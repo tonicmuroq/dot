@@ -283,7 +283,7 @@ func (av *AppVersion) GetSubAppYaml(name string) (*AppYaml, error) {
 }
 
 func (av *AppVersion) ListSubAppYamls() ([]*AppYaml, error) {
-	var ays []*AppYaml
+	var ays []*AppYaml = []*AppYaml{}
 	dir := path.Join(AppPathPrefix, av.Name, av.Version, "sub")
 	r, err := etcdClient.Get(dir, false, false)
 	if err != nil {
