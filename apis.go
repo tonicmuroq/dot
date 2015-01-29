@@ -59,7 +59,7 @@ func AddContainerHandler(req *Request) interface{} {
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
 	daemon := req.Form.Get("daemon")
-	sub := req.Form.Get("sub")
+	sub := req.Form.Get("sub_app")
 
 	av := models.GetVersion(name, version)
 	host := models.GetHostByIP(ip)
@@ -130,7 +130,7 @@ func DeployApplicationHandler(req *Request) interface{} {
 	version := req.URL.Query().Get(":version")
 	ips := req.Form["hosts"]
 	daemon := req.Form.Get("daemon")
-	sub := req.Form.Get("sub")
+	sub := req.Form.Get("sub_app")
 
 	av := models.GetVersion(name, version)
 	hosts := models.GetHostsByIPs(ips)
