@@ -226,11 +226,11 @@ func (self *LeviGroupedTask) Done() bool {
 
 func AddContainerTask(av *AppVersion, host *Host, appYaml *AppYaml, daemon bool) *Task {
 	if len(appYaml.Daemon) == 0 && daemon {
-		Logger.Debug("no daemon defined in app.yaml")
+		Logger.Info("no daemon defined in app.yaml")
 		return nil
 	}
 	if len(appYaml.Cmd) == 0 && !daemon {
-		Logger.Debug("no cmd defined in app.yaml")
+		Logger.Info("no cmd defined in app.yaml")
 		return nil
 	}
 
