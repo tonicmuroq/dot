@@ -10,6 +10,7 @@ type Container struct {
 	HostID      int    `orm:"column(host_id)" json:"host_id"`
 	AppName     string `json:"app_name"`
 	Version     string `json:"version"`
+	SubApp      string `orm:"column(sub_app)" json:"sub_app"`
 }
 
 func (c *Container) Application() *Application {
@@ -38,7 +39,7 @@ func (c *Container) Delete() bool {
 	return false
 }
 
-func NewContainer(av *AppVersion, host *Host, port int, containerID, identID string) *Container {
+func NewContainer(av *AppVersion, host *Host, port int, containerID, identID, subApp string) *Container {
 	c := Container{
 		Port:        port,
 		ContainerID: containerID,
@@ -46,6 +47,7 @@ func NewContainer(av *AppVersion, host *Host, port int, containerID, identID str
 		HostID:      host.ID,
 		AppName:     av.Name,
 		Version:     av.Version,
+		SubApp:      subApp,
 	}
 	if _, err := db.Insert(&c); err == nil {
 		return &c

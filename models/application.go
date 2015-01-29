@@ -263,6 +263,8 @@ func (av *AppVersion) AddAppYaml(name, yaml string) {
 	etcdClient.Set(key, yaml, 0)
 }
 
+// if name is ""
+// then simply return main app.yaml
 func (av *AppVersion) GetSubAppYaml(name string) (*AppYaml, error) {
 	if name == "" {
 		return av.GetAppYaml()
