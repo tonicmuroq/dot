@@ -181,6 +181,7 @@ func (self *Task) ToAddTask() *AddTask {
 		CpuSet:    self.CpuSet,
 		Daemon:    self.Daemon,
 		Test:      self.Test,
+		SubApp:    self.SubApp,
 		done:      false,
 	}
 }
@@ -196,6 +197,7 @@ func (self *Task) ToRemoveTask() *RemoveTask {
 		Version:   self.Version,
 		Container: self.Container,
 		RmImage:   self.RmImage,
+		SubApp:    self.SubApp,
 		done:      false,
 	}
 }
