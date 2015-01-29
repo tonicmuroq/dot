@@ -59,18 +59,27 @@ func AddContainerHandler(req *Request) interface{} {
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
 	daemon := req.Form.Get("daemon")
+	sub := req.Form.Get("sub")
 
 	av := models.GetVersion(name, version)
 	host := models.GetHostByIP(ip)
-
 	if av == nil || host == nil {
 		return NoSuchApp
 	}
-	if appyaml, err := av.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
+
+	// if sub is ""
+	// will return main app.yaml
+	// then the main app will be deployed
+	appyaml, err := av.GetSubAppYaml(sub)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+
+	if daemon == "true" && len(appyaml.Daemon) == 0 {
 		return JSON{"r": 1, "msg": "daemon set true but no daemon defined"}
 	}
-	task := models.AddContainerTask(av, host, daemon == "true")
-	err := hub.Dispatch(host.IP, task)
+	task := models.AddContainerTask(av, host, appyaml, daemon == "true")
+	err = hub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -121,16 +130,27 @@ func DeployApplicationHandler(req *Request) interface{} {
 	version := req.URL.Query().Get(":version")
 	ips := req.Form["hosts"]
 	daemon := req.Form.Get("daemon")
+	sub := req.Form.Get("sub")
 
 	av := models.GetVersion(name, version)
 	hosts := models.GetHostsByIPs(ips)
 	if av == nil {
 		return NoSuchApp
 	}
-	if appyaml, err := av.GetAppYaml(); err != nil || (daemon == "true" && len(appyaml.Daemon) == 0) {
+
+	// if sub is ""
+	// will return main app.yaml
+	// then the main app will be deployed
+	appyaml, err := av.GetSubAppYaml(sub)
+	if err != nil {
+		return JSON{"r": 1, "msg": err.Error()}
+	}
+
+	if daemon == "true" && len(appyaml.Daemon) == 0 {
 		return JSON{"r": 1, "msg": "no daemon defined"}
 	}
-	taskIds, err := DeployApplicationHelper(av, hosts, daemon == "true")
+
+	taskIds, err := DeployApplicationHelper(av, hosts, appyaml, daemon == "true")
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}

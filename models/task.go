@@ -38,6 +38,7 @@ type AddTask struct {
 	CpuSet    string
 	Daemon    string
 	Test      string
+	SubApp    string `json:sub_app`
 	done      bool
 }
 
@@ -47,6 +48,7 @@ type RemoveTask struct {
 	Version   string
 	Container string
 	RmImage   bool
+	SubApp    string `json:sub_app`
 	done      bool
 }
 
@@ -66,6 +68,7 @@ type Task struct {
 	Daemon    string
 	Test      string
 	Container string
+	SubApp    string `json:sub_app`
 	Build     BuildTask
 	RmImage   bool
 }
@@ -221,24 +224,24 @@ func (self *LeviGroupedTask) Done() bool {
 	return self.Tasks != nil && self.Tasks.Done()
 }
 
-func AddContainerTask(av *AppVersion, host *Host, daemon bool) *Task {
-	appYaml, err := av.GetAppYaml()
-	if err != nil {
-		Logger.Debug("app.yaml error: ", err)
-		return nil
-	}
+func AddContainerTask(av *AppVersion, host *Host, appYaml *AppYaml, daemon bool) *Task {
 	if len(appYaml.Daemon) == 0 && daemon {
-		Logger.Debug("no daemon defined in app.yaml")
+		Logger.Info("no daemon defined in app.yaml")
 		return nil
 	}
 	if len(appYaml.Cmd) == 0 && !daemon {
-		Logger.Debug("no cmd defined in app.yaml")
+		Logger.Info("no cmd defined in app.yaml")
 		return nil
 	}
 
 	bind := 0
 	daemonID := ""
 	cmd := []string{}
+	subapp := ""
+
+	if appYaml.Appname != av.Name {
+		subapp = appYaml.Appname
+	}
 
 	if daemon {
 		bind = 0
@@ -273,6 +276,7 @@ func AddContainerTask(av *AppVersion, host *Host, daemon bool) *Task {
 		CpuShare: config.Config.Task.CpuShare,
 		CpuSet:   config.Config.Task.CpuSet,
 		Daemon:   daemonID,
+		SubApp:   subapp,
 	}
 }
 
@@ -303,6 +307,7 @@ func RemoveContainerTask(container *Container) *Task {
 		Uid:       0,
 		Container: container.ContainerID,
 		RmImage:   rmImg,
+		SubApp:    container.SubApp,
 	}
 }
 
@@ -312,7 +317,7 @@ func UpdateContainerTask(container *Container, av *AppVersion) *Task {
 	if host == nil || oav == nil {
 		return nil
 	}
-	appYaml, err := av.GetAppYaml()
+	appYaml, err := av.GetSubAppYaml(container.SubApp)
 	if err != nil {
 		return nil
 	}
@@ -359,6 +364,7 @@ func UpdateContainerTask(container *Container, av *AppVersion) *Task {
 		CpuSet:    config.Config.Task.CpuSet,
 		Daemon:    daemonID,
 		Container: container.ContainerID,
+		SubApp:    container.SubApp,
 		RmImage:   rmImg,
 	}
 }
@@ -443,5 +449,7 @@ func TestApplicationTask(av *AppVersion, host *Host) *Task {
 		Memory:   config.Config.Task.Memory,
 		CpuShare: config.Config.Task.CpuShare,
 		CpuSet:   config.Config.Task.CpuSet,
-		Test:     testID}
+		SubApp:   "",
+		Test:     testID,
+	}
 }

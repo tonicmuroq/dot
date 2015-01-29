@@ -190,12 +190,42 @@ func Register(projectname, version, namespace, appyaml, submitter string) *Appli
 		return nil
 	}
 	app.Manager = NewManagerSet(appname)
+	// copies old sub app.yaml
+	moveSubAppYaml(appname, version)
 
 	// create test/prod empty yaml file for levi
 	etcdClient.Create(resourceKey(appname, "test"), "", 0)
 	etcdClient.Create(resourceKey(appname, "prod"), "", 0)
 	etcdClient.Create(av.GetYamlPath("app"), appyaml, 0)
 	return app
+}
+
+// moveSubAppYaml moves sub app.yaml in
+// "/NBE/:appname/sub/" to
+// "/NBE/:appname/:version/sub/:subapp.yaml"
+func moveSubAppYaml(name, version string) error {
+	r, err := etcdClient.Get(path.Join(AppPathPrefix, name, "sub"), false, false)
+	if err != nil {
+		Logger.Info("moveSubAppYaml, err:", err)
+		return err
+	}
+	if !r.Node.Dir {
+		Logger.Info("moveSubAppYaml, err:", ShouldBeDIR)
+		return ShouldBeDIR
+	}
+
+	for _, node := range r.Node.Nodes {
+		if node.Dir {
+			// just ignore, dir shouldn't exist there
+			continue
+		}
+		dirs := strings.Split(node.Key, "/")
+		key := path.Join(AppPathPrefix, name, version, "sub", dirs[len(dirs)-1])
+		// do move
+		etcdClient.Set(key, node.Value, 0)
+		etcdClient.Delete(node.Key, false)
+	}
+	return nil
 }
 
 func (a *Application) CreateDNS() error {
@@ -257,12 +287,17 @@ func (av *AppVersion) SetImageAddr(addr string) {
 	db.Update(av)
 }
 
+// set sub app.yaml in both
+// "/NBE/:appname/:appversion/sub/:sub.yaml" and
+// "/NBE/:appname/sub/:sub.yaml"
+// next registration will move "/NBE/:appname/sub/:sub.yaml" away
 func (av *AppVersion) AddAppYaml(name, yaml string) {
-	key := path.Join(AppPathPrefix, av.Name, av.Version, "sub", fmt.Sprintf("%s.yaml", name))
-	etcdClient.Create(key, "", 0)
-	etcdClient.Set(key, yaml, 0)
+	etcdClient.Set(path.Join(AppPathPrefix, av.Name, av.Version, "sub", fmt.Sprintf("%s.yaml", name)), yaml, 0)
+	etcdClient.Set(path.Join(AppPathPrefix, av.Name, "sub", fmt.Sprintf("%s.yaml", name)), yaml, 0)
 }
 
+// if name is ""
+// then simply return main app.yaml
 func (av *AppVersion) GetSubAppYaml(name string) (*AppYaml, error) {
 	if name == "" {
 		return av.GetAppYaml()

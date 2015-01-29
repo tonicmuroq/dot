@@ -215,7 +215,7 @@ func doAdd(av *models.AppVersion, host *models.Host, tasks []*models.AddTask, re
 			if !task.IsTest() {
 				if retval != "" {
 					job.Done(models.SUCC, retval)
-					models.NewContainer(av, host, task.Bind, retval, task.Daemon)
+					models.NewContainer(av, host, task.Bind, retval, task.Daemon, task.SubApp)
 				} else {
 					job.Done(models.FAIL, retval)
 				}
@@ -232,7 +232,7 @@ func doAdd(av *models.AppVersion, host *models.Host, tasks []*models.AddTask, re
 				// 如果测试任务就没返回容器值, 那么直接挂
 				if retval != "" {
 					job.SetResult(retval)
-					models.NewContainer(av, host, task.Bind, retval, task.Test)
+					models.NewContainer(av, host, task.Bind, retval, task.Test, task.SubApp)
 				} else {
 					job.Done(models.FAIL, "failed when create testing container")
 				}
