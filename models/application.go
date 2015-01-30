@@ -229,19 +229,21 @@ func moveSubAppYaml(name, version string) error {
 }
 
 func (a *Application) CreateDNS() error {
-	dns := map[string]string{
-		"host": config.Config.Masteraddr,
-	}
-	p := path.Join(config.Config.DNSSuffix, a.Name)
-	_, err := etcdClient.Create(p, "", 0)
+	names := map[string]struct{}{}
+	record, err := JSONEncode(map[string]string{"host": config.Config.Masteraddr})
 	if err != nil {
 		return err
 	}
-	r, err := JSONEncode(dns)
-	if err != nil {
-		return err
+	for _, c := range a.Containers() {
+		if c.SubApp == "" {
+			names[c.AppName] = struct{}{}
+		} else {
+			names[c.SubApp] = struct{}{}
+		}
 	}
-	etcdClient.Set(p, r, 0)
+	for domain, _ := range names {
+		etcdClient.Set(path.Join(config.Config.DNSSuffix, domain), record, 0)
+	}
 	return nil
 }
 
