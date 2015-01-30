@@ -1,10 +1,11 @@
 package dot
 
 import (
-	"github.com/gorilla/websocket"
 	"net/http"
 	"strconv"
 	"sync"
+
+	"github.com/gorilla/websocket"
 
 	. "utils"
 )
@@ -104,7 +105,7 @@ func (self *BufferedLog) Feed(line string) {
 	self.input <- line
 }
 
-func ServeLogWs(w http.ResponseWriter, r *http.Request) {
+func ServeLogWS(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return

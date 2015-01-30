@@ -24,15 +24,16 @@ const (
 	maxMessageSize     = 1024 * 1024
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024 * 1024,
-	WriteBufferSize: 1024 * 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
-}
+var (
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024 * 1024,
+		WriteBufferSize: 1024 * 1024,
+		CheckOrigin:     func(r *http.Request) bool { return true },
+	}
+	ZeroTime time.Time
+	LeviHub  *Hub
+)
 
-var ZeroTime time.Time
-
-// websocket 连接
 type Connection struct {
 	ws     *websocket.Conn
 	host   string
@@ -45,7 +46,6 @@ type NInfo struct {
 	SubApp string
 }
 
-// 保存所有连接, 定时 ping
 type Hub struct {
 	levis         map[string]*Levi
 	lastCheckTime map[string]time.Time
@@ -55,8 +55,6 @@ type Hub struct {
 	size          int
 	finished      bool
 }
-
-var LeviHub *Hub
 
 // Hub methods
 func (self *Hub) CheckAlive() {
@@ -276,7 +274,7 @@ func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 	return c
 }
 
-func ServeWs(w http.ResponseWriter, r *http.Request) {
+func ServeWS(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return

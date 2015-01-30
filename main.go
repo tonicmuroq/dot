@@ -30,8 +30,8 @@ func main() {
 	go dot.LeviHub.Run()
 
 	http.Handle("/", apiserver.RestAPIServer)
-	http.HandleFunc("/ws", dot.ServeWs)
-	http.HandleFunc("/log", dot.ServeLogWs)
+	http.HandleFunc("/ws", dot.ServeWS)
+	http.HandleFunc("/log", dot.ServeLogWS)
 
 	err := http.ListenAndServe(config.Config.Bind, nil)
 	if err != nil {

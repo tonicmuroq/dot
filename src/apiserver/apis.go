@@ -32,10 +32,9 @@ func JSONWrapper(f func(*Request) interface{}) func(http.ResponseWriter, *http.R
 }
 
 func EchoHandler(req *Request) interface{} {
-	msg := req.Form.Get("msg")
 	return JSON{
 		"r":     0,
-		"msg":   msg,
+		"msg":   req.Form.Get("msg"),
 		"start": req.Start,
 		"limit": req.Limit,
 		"user":  req.User,
