@@ -207,19 +207,39 @@ func (self *AddTask) IsTest() bool {
 	return self.Test != ""
 }
 
-// LeviGroupedTask
-// only add/remove needs to retart nginx
-// and test shall be ignored
-func (self *LeviGroupedTask) NeedToRestartNginx() bool {
+// 一批任务里, 如果一些SubApp有增减, 那么这些SubApp对应的配置需要重启
+// 测试任务不算
+func (self *LeviGroupedTask) RestartSubAppNames() []string {
 	lt := self.Tasks
-	// Test not counted
-	addCount := 0
+	g := map[string]int{}
 	for _, add := range lt.Add {
 		if !add.IsTest() {
-			addCount += 1
+			g[add.SubApp] += 1
 		}
 	}
-	return addCount > 0 || len(lt.Remove) != 0
+	for _, remove := range lt.Remove {
+		g[remove.SubApp] += 1
+	}
+	r := make([]string, len(g))
+	for key, _ := range g {
+		r = append(r, key)
+	}
+	return r
+}
+
+// 一个任务组里, 如果这个levi所属的host上这个sub app的容器数为0
+// 那么说明删完了, 需要马上重启
+func (self *LeviGroupedTask) RestartImmediately(host *Host, name string) bool {
+	cg := map[string]int{}
+	for _, c := range GetContainerByHostAndApp(host, name) {
+		cg[c.SubApp] += 1
+	}
+	for _, remove := range self.Tasks.Remove {
+		if _, e := cg[remove.SubApp]; !e {
+			return true
+		}
+	}
+	return false
 }
 
 func (self *LeviGroupedTask) Done() bool {
