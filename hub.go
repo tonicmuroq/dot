@@ -40,12 +40,17 @@ type Connection struct {
 	closed bool
 }
 
+type NInfo struct {
+	ID     int
+	SubApp string
+}
+
 // 保存所有连接, 定时 ping
 type Hub struct {
 	levis         map[string]*Levi
 	lastCheckTime map[string]time.Time
-	appIds        []int
-	done          chan int
+	apps          map[int][]string
+	done          chan *NInfo
 	immediate     chan bool
 	size          int
 	finished      bool
@@ -73,19 +78,19 @@ func (self *Hub) CheckAlive() {
 func (self *Hub) Run() {
 	for !self.finished {
 		select {
-		case appId := <-self.done:
-			self.appIds = append(self.appIds, appId)
-			if len(self.appIds) >= self.size {
+		case nInfo := <-self.done:
+			self.apps[nInfo.ID] = append(self.apps[nInfo.ID], nInfo.SubApp)
+			if len(self.apps) >= self.size {
 				Logger.Info("restart nginx on full")
 				self.RestartNginx()
 			}
 		case <-time.After(time.Second * time.Duration(config.Config.Task.Dispatch)):
-			if len(self.appIds) != 0 {
+			if len(self.apps) != 0 {
 				Logger.Info("restart nginx on schedule")
 				self.RestartNginx()
 			}
 		case <-self.immediate:
-			if len(self.appIds) != 0 {
+			if len(self.apps) != 0 {
 				Logger.Info("restart nginx immediately")
 				self.RestartNginx()
 			}
@@ -94,7 +99,7 @@ func (self *Hub) Run() {
 }
 
 func (self *Hub) RestartNginx() {
-	for _, avID := range self.appIds {
+	for avID, subnames := range self.apps {
 		av := models.GetVersionByID(avID)
 		if av == nil {
 			continue
@@ -104,54 +109,69 @@ func (self *Hub) RestartNginx() {
 			continue
 		}
 
-		containers := models.GetContainers(-1, av.Name, "", 0, 1000)
-
-		conf := path.Join(config.Config.Nginx.Conf, fmt.Sprintf("%s.conf", app.Name))
-		var data = struct {
-			Name      string
-			PodName   string
-			Static    string
-			Path      string
-			UpStreams []string
-		}{
-			Name:      app.Name,
-			PodName:   config.Config.PodName,
-			Static:    path.Join("/", av.StaticPath()),
-			Path:      path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", av.Name, av.Version)),
-			UpStreams: []string{},
+		cg := map[string][]*models.Container{}
+		for _, c := range app.Containers() {
+			if c.SubApp == "" {
+				cg[c.AppName] = append(cg[c.AppName], c)
+			} else {
+				cg[c.SubApp] = append(cg[c.SubApp], c)
+			}
 		}
 
-		remoteConfig := fmt.Sprintf("/etc/nginx/conf.d/%s.conf", av.Name)
+		for _, subname := range subnames {
+			appname := subname
+			if appname == "" {
+				appname = app.Name
+			}
+			conf := path.Join(config.Config.Nginx.Conf, fmt.Sprintf("%s.conf", appname))
+			remoteConfig := fmt.Sprintf("/etc/nginx/conf.d/%s.conf", appname)
+			var data = struct {
+				Name      string
+				PodName   string
+				Static    string
+				Path      string
+				UpStreams []string
+			}{
+				Name:      appname,
+				PodName:   config.Config.PodName,
+				Static:    path.Join("/", av.StaticPath()),
+				Path:      path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", av.Name, av.Version)),
+				UpStreams: []string{},
+			}
 
-		if len(containers) == 0 {
-			EnsureFileAbsent(conf)
-			if err := exec.Command("res", "nginx_clean", remoteConfig).Run(); err != nil {
-				Logger.Info("res", "nginx_clean", remoteConfig)
-				Logger.Info(err)
-			}
-		} else {
-			f, err := os.Create(conf)
-			defer f.Close()
-			if err != nil {
-				Logger.Info("Create nginx conf failed", err)
-				continue
-			}
-			for _, container := range containers {
-				if container.Port == 0 {
-					// ignore daemon
+			cs, exists := cg[appname]
+			if !exists {
+				// 删
+				EnsureFileAbsent(conf)
+				if err := exec.Command("res", "nginx_clean", remoteConfig).Run(); err != nil {
+					Logger.Info("res", "nginx_clean", remoteConfig)
+					Logger.Info(err)
+				}
+			} else {
+				f, err := os.Create(conf)
+				defer f.Close()
+				if err != nil {
+					Logger.Info("Create nginx conf failed", err)
 					continue
 				}
-				upStream := fmt.Sprintf("%s:%v", container.Host().IP, container.Port)
-				data.UpStreams = append(data.UpStreams, upStream)
+				for _, container := range cs {
+					if container.Port == 0 {
+						// ignore daemon
+						continue
+					}
+					upStream := fmt.Sprintf("%s:%v", container.Host().IP, container.Port)
+					data.UpStreams = append(data.UpStreams, upStream)
+				}
+				tmpl := template.Must(template.ParseFiles(config.Config.Nginx.Template))
+				if err := tmpl.Execute(f, data); err != nil {
+					Logger.Info("Render nginx conf failed", err)
+				}
+				if err := exec.Command("res", "nginx_reload", conf, remoteConfig).Run(); err != nil {
+					Logger.Info("res", "nginx_reload", conf, remoteConfig)
+					Logger.Info(err)
+				}
 			}
-			tmpl := template.Must(template.ParseFiles(config.Config.Nginx.Template))
-			if err := tmpl.Execute(f, data); err != nil {
-				Logger.Info("Render nginx conf failed", err)
-			}
-			if err := exec.Command("res", "nginx_reload", conf, remoteConfig).Run(); err != nil {
-				Logger.Info("res", "nginx_reload", conf, remoteConfig)
-				Logger.Info(err)
-			}
+
 		}
 
 		app.CreateDNS()
@@ -160,7 +180,7 @@ func (self *Hub) RestartNginx() {
 	if err := cmd.Run(); err != nil {
 		Logger.Info("Restart nginx failed", err)
 	}
-	self.appIds = []int{}
+	self.apps = map[int][]string{}
 }
 
 func (self *Hub) AddLevi(levi *Levi) {
@@ -209,8 +229,8 @@ func (self *Hub) Dispatch(host string, task *models.Task) error {
 var hub = &Hub{
 	levis:         make(map[string]*Levi),
 	lastCheckTime: make(map[string]time.Time),
-	appIds:        []int{},
-	done:          make(chan int),
+	apps:          map[int][]string{},
+	done:          make(chan *NInfo),
 	immediate:     make(chan bool),
 	size:          10,
 	finished:      false,

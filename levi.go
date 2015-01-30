@@ -162,11 +162,11 @@ func (self *Levi) Run() {
 
 			if lgt.Done() {
 
-				if lgt.NeedToRestartNginx() {
-					hub.done <- av.ID
+				for _, subappname := range lgt.RestartSubAppNames() {
+					hub.done <- &NInfo{av.ID, subappname}
 				}
 
-				if len(models.GetContainerByHostAndApp(host, av.Name)) == 0 {
+				if lgt.RestartImmediately(host, av.Name) {
 					hub.immediate <- true
 				}
 
