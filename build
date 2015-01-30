@@ -1,0 +1,3 @@
+#!/bin/sh
+export GOPATH=`pwd`:$GOPATH
+go build -o dot

@@ -1,9 +1,10 @@
-package models
+package types
 
 import (
-	"../config"
-	. "../utils"
 	"strings"
+
+	"config"
+	. "utils"
 )
 
 const (

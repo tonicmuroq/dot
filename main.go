@@ -7,12 +7,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"./config"
-	"./models"
-	. "./utils"
+	"apiserver"
+	"config"
+	"dot"
+	"types"
+	. "utils"
 )
 
-var version = "Dot Version 0.2.0 (add content-type 2015.01.22)"
+var version = "Dot Version 0.3.0 (sub app support 2015.01.30)"
 
 func main() {
 
@@ -22,14 +24,14 @@ func main() {
 	}
 
 	config.LoadConfig()
-	models.LoadStore()
+	types.LoadStore()
 
-	go hub.CheckAlive()
-	go hub.Run()
+	go dot.LeviHub.CheckAlive()
+	go dot.LeviHub.Run()
 
-	http.Handle("/", RestServer)
-	http.HandleFunc("/ws", ServeWs)
-	http.HandleFunc("/log", ServeLogWs)
+	http.Handle("/", apiserver.RestAPIServer)
+	http.HandleFunc("/ws", dot.ServeWs)
+	http.HandleFunc("/log", dot.ServeLogWs)
 
 	err := http.ListenAndServe(config.Config.Bind, nil)
 	if err != nil {
@@ -43,5 +45,5 @@ func main() {
 	signal.Notify(sc, syscall.SIGKILL)
 	signal.Notify(sc, syscall.SIGQUIT)
 	Logger.Info("Got <-", <-sc)
-	hub.Close()
+	dot.LeviHub.Close()
 }

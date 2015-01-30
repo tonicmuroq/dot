@@ -1,6 +1,6 @@
-package models
+package types
 
-import "../config"
+import "config"
 
 type Host struct {
 	ID     int    `orm:"column(id);auto;pk" json:"id"`

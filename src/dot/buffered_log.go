@@ -1,11 +1,12 @@
-package main
+package dot
 
 import (
-	. "./utils"
 	"github.com/gorilla/websocket"
 	"net/http"
 	"strconv"
 	"sync"
+
+	. "utils"
 )
 
 type BufferedLog struct {

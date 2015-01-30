@@ -1,16 +1,20 @@
-package models
+package types
 
 import (
-	"../config"
+	"sync"
+
 	"github.com/astaxie/beego/orm"
 	"github.com/coreos/go-etcd/etcd"
 	_ "github.com/go-sql-driver/mysql"
-	"sync"
+
+	"config"
 )
 
-var db orm.Ormer
-var etcdClient *etcd.Client
-var portMutex sync.Mutex
+var (
+	db         orm.Ormer
+	etcdClient *etcd.Client
+	portMutex  sync.Mutex
+)
 
 func LoadStore() {
 	// mysql

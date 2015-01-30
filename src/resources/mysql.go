@@ -1,15 +1,17 @@
 package resources
 
 import (
-	"../config"
-	"../utils"
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/astaxie/beego/orm"
-	_ "github.com/go-sql-driver/mysql"
 	"strings"
 	"time"
+
+	"github.com/astaxie/beego/orm"
+	_ "github.com/go-sql-driver/mysql"
+
+	"config"
+	"utils"
 )
 
 var (

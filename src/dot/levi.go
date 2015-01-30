@@ -1,4 +1,4 @@
-package main
+package dot
 
 import (
 	"fmt"
@@ -7,21 +7,21 @@ import (
 	"sync"
 	"time"
 
-	"./config"
-	"./models"
-	. "./utils"
-
 	"code.google.com/p/go-uuid/uuid"
+
+	"config"
+	"types"
+	. "utils"
 )
 
 type Levi struct {
 	conn      *Connection
-	inTask    chan *models.Task
+	inTask    chan *types.Task
 	immediate chan bool
 	host      string
 	size      int
-	tasks     map[string]*models.GroupedTask
-	waiting   map[string]*models.LeviGroupedTask
+	tasks     map[string]*types.GroupedTask
+	waiting   map[string]*types.LeviGroupedTask
 	running   bool
 	wg        *sync.WaitGroup
 }
@@ -29,24 +29,24 @@ type Levi struct {
 func NewLevi(conn *Connection, size int) *Levi {
 	return &Levi{
 		conn:      conn,
-		inTask:    make(chan *models.Task),
+		inTask:    make(chan *types.Task),
 		immediate: make(chan bool),
 		host:      conn.host,
 		size:      size,
-		tasks:     make(map[string]*models.GroupedTask),
-		waiting:   make(map[string]*models.LeviGroupedTask),
+		tasks:     make(map[string]*types.GroupedTask),
+		waiting:   make(map[string]*types.LeviGroupedTask),
 		running:   true,
 		wg:        &sync.WaitGroup{},
 	}
 }
 
-func (self *Levi) Host() *models.Host {
-	return models.GetHostByIP(self.host)
+func (self *Levi) Host() *types.Host {
+	return types.GetHostByIP(self.host)
 }
 
 func (self *Levi) WaitTask() {
 	defer self.wg.Done()
-	var task *models.Task
+	var task *types.Task
 	for self.running {
 		select {
 		case task, self.running = <-self.inTask:
@@ -57,12 +57,12 @@ func (self *Levi) WaitTask() {
 			}
 			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Version)
 			if _, exists := self.tasks[key]; !exists {
-				self.tasks[key] = &models.GroupedTask{
+				self.tasks[key] = &types.GroupedTask{
 					Name:    task.Name,
 					Uid:     task.Uid,
 					ID:      uuid.New(),
 					Version: task.Version,
-					Tasks:   []*models.Task{},
+					Tasks:   []*types.Task{},
 				}
 			}
 			self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
@@ -97,7 +97,7 @@ func (self *Levi) Close() {
 func (self *Levi) SendTasks() {
 	self.wg.Add(len(self.tasks))
 	for _, groupedTask := range self.tasks {
-		go func(groupedTask *models.GroupedTask) {
+		go func(groupedTask *types.GroupedTask) {
 			defer self.wg.Done()
 			leviGroupedTask := groupedTask.ToLeviGroupedTask()
 			self.waiting[groupedTask.ID] = leviGroupedTask
@@ -107,7 +107,7 @@ func (self *Levi) SendTasks() {
 		}(groupedTask)
 	}
 	self.wg.Wait()
-	self.tasks = make(map[string]*models.GroupedTask)
+	self.tasks = make(map[string]*types.GroupedTask)
 }
 
 func (self *Levi) Run() {
@@ -115,11 +115,11 @@ func (self *Levi) Run() {
 	finish := false
 	defer func() {
 		self.Close()
-		hub.RemoveLevi(self.host)
+		LeviHub.RemoveLevi(self.host)
 	}()
 	host := self.Host()
 	for !finish {
-		var taskReply models.TaskReply
+		var taskReply types.TaskReply
 		switch err := self.conn.ws.ReadJSON(&taskReply); {
 		case err != nil:
 			Logger.Info("read json error: ", err)
@@ -139,7 +139,7 @@ func (self *Levi) Run() {
 				continue
 			}
 
-			av := models.GetVersion(lgt.Name, lgt.Version)
+			av := types.GetVersion(lgt.Name, lgt.Version)
 			if av == nil {
 				Logger.Info(fmt.Sprintf("AppVersion %v", av), "没了")
 				continue
@@ -148,26 +148,26 @@ func (self *Levi) Run() {
 			lt := lgt.Tasks
 
 			switch taskReply.Type {
-			case models.ADD:
+			case types.ADD:
 				doAdd(av, host, lt.Add, taskReply)
-			case models.REMOVE:
+			case types.REMOVE:
 				doRemove(lt.Remove, taskReply)
-			case models.BUILD:
+			case types.BUILD:
 				doBuild(av, lt.Build, taskReply)
-			case models.TEST:
+			case types.TEST:
 				doTest(av, lt.Add, taskReply)
-			case models.INFO:
+			case types.INFO:
 				doStatus(host, taskReply.Data)
 			}
 
 			if lgt.Done() {
 
 				for _, subappname := range lgt.RestartSubAppNames() {
-					hub.done <- &NInfo{av.ID, subappname}
+					LeviHub.done <- &NInfo{av.ID, subappname}
 				}
 
 				if lgt.RestartImmediately(host, av.Name) {
-					hub.immediate <- true
+					LeviHub.immediate <- true
 				}
 
 				delete(self.waiting, taskUUID)
@@ -185,7 +185,7 @@ func (self *Levi) Len() int {
 }
 
 // status没有关联task, 不要担心
-func doStatus(host *models.Host, data string) {
+func doStatus(host *types.Host, data string) {
 	r := strings.Split(data, "|")
 	// status|name|containerId
 	if len(r) != 3 {
@@ -194,34 +194,34 @@ func doStatus(host *models.Host, data string) {
 	status, name, containerId := r[0], r[1], r[2]
 	if status == "die" {
 		Logger.Info("Should delete ", containerId, " of ", name)
-		if c := models.GetContainerByCid(containerId); c != nil {
+		if c := types.GetContainerByCid(containerId); c != nil {
 			// 不要发了
-			// hub.Dispatch(host.IP, models.RemoveContainerTask(c))
+			// LeviHub.Dispatch(host.IP, types.RemoveContainerTask(c))
 		} else {
 			Logger.Info("Container ", containerId, " already removed")
 		}
 	}
 }
 
-func doAdd(av *models.AppVersion, host *models.Host, tasks []*models.AddTask, reply models.TaskReply) {
+func doAdd(av *types.AppVersion, host *types.Host, tasks []*types.AddTask, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
 		return
 	}
-	if job := models.GetJob(task.ID); job != nil {
+	if job := types.GetJob(task.ID); job != nil {
 		switch reply.Done {
 		case true:
 			if !task.IsTest() {
 				if retval != "" {
-					job.Done(models.SUCC, retval)
-					models.NewContainer(av, host, task.Bind, retval, task.Daemon, task.SubApp)
+					job.Done(types.SUCC, retval)
+					types.NewContainer(av, host, task.Bind, retval, task.Daemon, task.SubApp)
 				} else {
-					job.Done(models.FAIL, retval)
+					job.Done(types.FAIL, retval)
 				}
 			} else {
 				// 理论上不可能出现任务是测试Type是ADD_TASK同时又是Done为true的
-				job.Done(models.FAIL, retval)
+				job.Done(types.FAIL, retval)
 			}
 			task.Done()
 		case false:
@@ -232,9 +232,9 @@ func doAdd(av *models.AppVersion, host *models.Host, tasks []*models.AddTask, re
 				// 如果测试任务就没返回容器值, 那么直接挂
 				if retval != "" {
 					job.SetResult(retval)
-					models.NewContainer(av, host, task.Bind, retval, task.Test, task.SubApp)
+					types.NewContainer(av, host, task.Bind, retval, task.Test, task.SubApp)
 				} else {
-					job.Done(models.FAIL, "failed when create testing container")
+					job.Done(types.FAIL, "failed when create testing container")
 				}
 			}
 		}
@@ -242,14 +242,14 @@ func doAdd(av *models.AppVersion, host *models.Host, tasks []*models.AddTask, re
 
 }
 
-func doTest(av *models.AppVersion, tasks []*models.AddTask, reply models.TaskReply) {
+func doTest(av *types.AppVersion, tasks []*types.AddTask, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 	b := streamLogHub.GetBufferedLog(task.ID, true)
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
 		return
 	}
-	if job := models.GetJob(task.ID); job != nil {
+	if job := types.GetJob(task.ID); job != nil {
 		b.Feed(retval)
 		switch reply.Done {
 		case false:
@@ -257,14 +257,14 @@ func doTest(av *models.AppVersion, tasks []*models.AddTask, reply models.TaskRep
 			Logger.Debug("Test output stream: ", retval)
 		case true:
 			if task.IsTest() {
-				container := models.GetContainerByCid(job.Result)
+				container := types.GetContainerByCid(job.Result)
 				if container == nil {
 					return
 				}
 				if retval == "0" {
-					job.Done(models.SUCC, fmt.Sprintf("%s|%s", container.IdentID, retval))
+					job.Done(types.SUCC, fmt.Sprintf("%s|%s", container.IdentID, retval))
 				} else {
-					job.Done(models.FAIL, fmt.Sprintf("%s|%s", container.IdentID, retval))
+					job.Done(types.FAIL, fmt.Sprintf("%s|%s", container.IdentID, retval))
 				}
 				container.Delete()
 				streamLogHub.RemoveBufferedLog(task.ID)
@@ -275,7 +275,7 @@ func doTest(av *models.AppVersion, tasks []*models.AddTask, reply models.TaskRep
 
 }
 
-func doBuild(av *models.AppVersion, tasks []*models.BuildTask, reply models.TaskReply) {
+func doBuild(av *types.AppVersion, tasks []*types.BuildTask, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 	b := streamLogHub.GetBufferedLog(task.ID, true)
 	b.Feed(retval)
@@ -295,12 +295,12 @@ func doBuild(av *models.AppVersion, tasks []*models.BuildTask, reply models.Task
 		if err := CopyFiles(staticPath, staticSrcPath, appUserUid, appUserUid); err != nil {
 			Logger.Info("copy files error: ", err)
 		}
-		if job := models.GetJob(task.ID); job != nil {
+		if job := types.GetJob(task.ID); job != nil {
 			if retval != "" {
-				job.Done(models.SUCC, retval)
+				job.Done(types.SUCC, retval)
 				av.SetImageAddr(retval)
 			} else {
-				job.Done(models.FAIL, retval)
+				job.Done(types.FAIL, retval)
 			}
 		}
 		streamLogHub.RemoveBufferedLog(task.ID)
@@ -308,7 +308,7 @@ func doBuild(av *models.AppVersion, tasks []*models.BuildTask, reply models.Task
 	}
 }
 
-func doRemove(tasks []*models.RemoveTask, reply models.TaskReply) {
+func doRemove(tasks []*types.RemoveTask, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 
 	if task == nil {
@@ -319,17 +319,17 @@ func doRemove(tasks []*models.RemoveTask, reply models.TaskReply) {
 	case false:
 		Logger.Debug("Remove output stream: ", retval)
 	case true:
-		if old := models.GetContainerByCid(task.Container); old != nil {
+		if old := types.GetContainerByCid(task.Container); old != nil {
 			old.Delete()
 		} else {
 			Logger.Info("要删的容器已经不在了")
 		}
 		// build 根据返回值来判断是不是成功
-		if job := models.GetJob(task.ID); job != nil {
+		if job := types.GetJob(task.ID); job != nil {
 			if retval == "1" {
-				job.Done(models.SUCC, "removed")
+				job.Done(types.SUCC, "removed")
 			} else {
-				job.Done(models.FAIL, "not removed")
+				job.Done(types.FAIL, "not removed")
 			}
 		}
 		task.Done()

@@ -1,13 +1,14 @@
 package resources
 
 import (
-	"../config"
-	"../models"
 	"fmt"
+
+	"config"
+	"types"
 )
 
 func NewSentryDSN(appname, platform string) (map[string]interface{}, error) {
-	app := models.GetApplication(appname)
+	app := types.GetApplication(appname)
 	if app == nil {
 		return nil, fmt.Errorf("No application %s found", appname)
 	}

@@ -1,6 +1,6 @@
-package models
+package types
 
-import . "../utils"
+import . "utils"
 
 type Container struct {
 	ID          int    `orm:"column(id);auto;pk" json:"id"`

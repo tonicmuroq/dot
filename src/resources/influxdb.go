@@ -1,11 +1,13 @@
 package resources
 
 import (
-	"../config"
-	"../utils"
 	"fmt"
-	"github.com/influxdb/influxdb/client"
 	"time"
+
+	"github.com/influxdb/influxdb/client"
+
+	"config"
+	"utils"
 )
 
 func NewInfluxdb(appname string) (map[string]interface{}, error) {
