@@ -35,10 +35,9 @@ var (
 )
 
 type Connection struct {
-	ws     *websocket.Conn
-	host   string
-	port   int
-	closed bool
+	ws   *websocket.Conn
+	host string
+	port int
 }
 
 type NInfo struct {
@@ -239,25 +238,11 @@ func init() {
 }
 
 // Connection methods
-func (self *Connection) Read() ([]byte, error) {
-	_, message, err := self.ws.ReadMessage()
-	return message, err
-}
-
-func (self *Connection) Write(mt int, payload []byte) error {
-	return self.ws.WriteMessage(mt, payload)
-}
-
 func (self *Connection) Ping(payload []byte) error {
-	return self.Write(websocket.PingMessage, payload)
-}
-
-func (self *Connection) Send(payload []byte) error {
-	return self.Write(websocket.TextMessage, payload)
+	return self.ws.WriteMessage(websocket.PingMessage, payload)
 }
 
 func (self *Connection) CloseConnection() error {
-	self.closed = true
 	return self.ws.Close()
 }
 
@@ -270,7 +255,7 @@ func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 		Logger.Info("Connection pong: ", s, " from host: ", host)
 		return nil
 	})
-	c := &Connection{ws: ws, host: host, port: port, closed: false}
+	c := &Connection{ws: ws, host: host, port: port}
 	return c
 }
 
