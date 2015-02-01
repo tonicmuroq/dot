@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
-
 	"config"
 	"types"
 	. "utils"
@@ -20,7 +18,7 @@ type Levi struct {
 	immediate chan bool
 	host      string
 	size      int
-	tasks     map[string]*types.GroupedTask
+	tasks     map[string]*types.LeviGroupedTask
 	waiting   map[string]*types.LeviGroupedTask
 	running   bool
 	wg        *sync.WaitGroup
@@ -33,7 +31,7 @@ func NewLevi(conn *Connection, size int) *Levi {
 		immediate: make(chan bool),
 		host:      conn.host,
 		size:      size,
-		tasks:     make(map[string]*types.GroupedTask),
+		tasks:     make(map[string]*types.LeviGroupedTask),
 		waiting:   make(map[string]*types.LeviGroupedTask),
 		running:   true,
 		wg:        &sync.WaitGroup{},
@@ -55,17 +53,15 @@ func (self *Levi) WaitTask() {
 				// 有nil, 无视掉
 				break
 			}
-			key := fmt.Sprintf("%s:%s:%s", task.Name, task.Uid, task.Version)
-			if _, exists := self.tasks[key]; !exists {
-				self.tasks[key] = &types.GroupedTask{
-					Name:    task.Name,
-					Uid:     task.Uid,
-					ID:      uuid.New(),
-					Version: task.Version,
-					Tasks:   []*types.Task{},
-				}
+
+			key := fmt.Sprintf("%v:%v:%v", task.Name, task.Uid, task.Version)
+			lgt, exists := self.tasks[key]
+			if !exists {
+				lgt = types.NewLeviGroupedTask(task.Name, task.Uid, task.Version)
+				self.tasks[key] = lgt
 			}
-			self.tasks[key].Tasks = append(self.tasks[key].Tasks, task)
+			lgt.AppendTask(task)
+
 			if self.Len() >= self.size {
 				Logger.Debug("send tasks when full")
 				self.SendTasks()
@@ -96,18 +92,17 @@ func (self *Levi) Close() {
 
 func (self *Levi) SendTasks() {
 	self.wg.Add(len(self.tasks))
-	for _, groupedTask := range self.tasks {
-		go func(groupedTask *types.GroupedTask) {
+	for _, lgt := range self.tasks {
+		go func(lgt *types.LeviGroupedTask) {
 			defer self.wg.Done()
-			leviGroupedTask := groupedTask.ToLeviGroupedTask()
-			self.waiting[groupedTask.ID] = leviGroupedTask
-			if err := self.conn.ws.WriteJSON(&leviGroupedTask); err != nil {
+			self.waiting[lgt.UUID] = lgt
+			if err := self.conn.ws.WriteJSON(&lgt); err != nil {
 				Logger.Info(err, "JSON write error")
 			}
-		}(groupedTask)
+		}(lgt)
 	}
 	self.wg.Wait()
-	self.tasks = make(map[string]*types.GroupedTask)
+	self.tasks = make(map[string]*types.LeviGroupedTask)
 }
 
 func (self *Levi) Run() {
@@ -178,8 +173,8 @@ func (self *Levi) Run() {
 
 func (self *Levi) Len() int {
 	count := 0
-	for _, value := range self.tasks {
-		count += len(value.Tasks)
+	for _, lgt := range self.tasks {
+		count += lgt.Len()
 	}
 	return count
 }
@@ -203,7 +198,7 @@ func doStatus(host *types.Host, data string) {
 	}
 }
 
-func doAdd(av *types.AppVersion, host *types.Host, tasks []*types.AddTask, reply types.TaskReply) {
+func doAdd(av *types.AppVersion, host *types.Host, tasks []*types.Task, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 	if task == nil {
 		Logger.Info("task/retval is nil, ignore")
@@ -242,7 +237,7 @@ func doAdd(av *types.AppVersion, host *types.Host, tasks []*types.AddTask, reply
 
 }
 
-func doTest(av *types.AppVersion, tasks []*types.AddTask, reply types.TaskReply) {
+func doTest(av *types.AppVersion, tasks []*types.Task, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 	b := streamLogHub.GetBufferedLog(task.ID, true)
 	if task == nil {
@@ -275,7 +270,7 @@ func doTest(av *types.AppVersion, tasks []*types.AddTask, reply types.TaskReply)
 
 }
 
-func doBuild(av *types.AppVersion, tasks []*types.BuildTask, reply types.TaskReply) {
+func doBuild(av *types.AppVersion, tasks []*types.Task, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 	b := streamLogHub.GetBufferedLog(task.ID, true)
 	b.Feed(retval)
@@ -308,7 +303,7 @@ func doBuild(av *types.AppVersion, tasks []*types.BuildTask, reply types.TaskRep
 	}
 }
 
-func doRemove(tasks []*types.RemoveTask, reply types.TaskReply) {
+func doRemove(tasks []*types.Task, reply types.TaskReply) {
 	task, retval := tasks[reply.Index], reply.Data
 
 	if task == nil {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
@@ -24,7 +23,7 @@ func NewMySQLInstance(dbname, username string) (map[string]interface{}, error) {
 	db := orm.NewOrm()
 	db.Using(config.Config.Dbmgr.Name)
 
-	password := utils.CreateSha1HexValue([]byte(username + time.Now().String()))[:8]
+	password := utils.RandomString(8)
 	_, err = db.Raw(fmt.Sprintf("CREATE DATABASE `%s`", dbname)).Exec()
 	if err != nil {
 		utils.Logger.Info("create error, ", err)
