@@ -1,26 +1,27 @@
-package main
+package apiserver
 
 import (
-	"./models"
-	"./resources"
-	"./utils"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/bmizerany/pat"
+
+	"dot"
+	"resources"
+	"types"
+	"utils"
 )
 
-var RestServer *pat.PatternServeMux
-
-type JSON map[string]interface{}
-
 var (
+	RestAPIServer   *pat.PatternServeMux
 	NoSuchApp       = JSON{"r": 1, "msg": "no such app"}
 	NoSuchHost      = JSON{"r": 1, "msg": "no such host"}
 	NoSuchContainer = JSON{"r": 1, "msg": "no such container"}
 )
+
+type JSON map[string]interface{}
 
 func JSONWrapper(f func(*Request) interface{}) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -31,10 +32,9 @@ func JSONWrapper(f func(*Request) interface{}) func(http.ResponseWriter, *http.R
 }
 
 func EchoHandler(req *Request) interface{} {
-	msg := req.Form.Get("msg")
 	return JSON{
 		"r":     0,
-		"msg":   msg,
+		"msg":   req.Form.Get("msg"),
 		"start": req.Start,
 		"limit": req.Limit,
 		"user":  req.User,
@@ -47,7 +47,7 @@ func RegisterApplicationHandler(req *Request) interface{} {
 	group := req.Form.Get("group")
 	appyaml := req.Form.Get("appyaml")
 
-	app := models.Register(projectname, version, group, appyaml, req.User)
+	app := types.Register(projectname, version, group, appyaml, req.User)
 	if app == nil {
 		return JSON{"r": 1, "msg": "register app fail"}
 	}
@@ -61,8 +61,8 @@ func AddContainerHandler(req *Request) interface{} {
 	daemon := req.Form.Get("daemon")
 	sub := req.Form.Get("sub_app")
 
-	av := models.GetVersion(name, version)
-	host := models.GetHostByIP(ip)
+	av := types.GetVersion(name, version)
+	host := types.GetHostByIP(ip)
 	if av == nil || host == nil {
 		return NoSuchApp
 	}
@@ -78,8 +78,8 @@ func AddContainerHandler(req *Request) interface{} {
 	if daemon == "true" && len(appyaml.Daemon) == 0 {
 		return JSON{"r": 1, "msg": "daemon set true but no daemon defined"}
 	}
-	task := models.AddContainerTask(av, host, appyaml, daemon == "true")
-	err = hub.Dispatch(host.IP, task)
+	task := types.AddContainerTask(av, host, appyaml, daemon == "true")
+	err = dot.LeviHub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -92,14 +92,14 @@ func BuildImageHandler(req *Request) interface{} {
 	// 暂时没有monitor, 那么人肉指定host吧
 	ip := req.Form.Get("host")
 
-	av := models.GetVersion(name, version)
-	host := models.GetHostByIP(ip)
+	av := types.GetVersion(name, version)
+	host := types.GetHostByIP(ip)
 	if av == nil || host == nil {
 		return NoSuchApp
 	}
 	base := req.Form.Get("base")
-	task := models.BuildImageTask(av, base)
-	err := hub.Dispatch(host.IP, task)
+	task := types.BuildImageTask(av, base)
+	err := dot.LeviHub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -112,13 +112,13 @@ func TestImageHandler(req *Request) interface{} {
 	// 暂时没有monitor, 那么人肉指定host吧
 	ip := req.Form.Get("host")
 
-	av := models.GetVersion(name, version)
-	host := models.GetHostByIP(ip)
+	av := types.GetVersion(name, version)
+	host := types.GetHostByIP(ip)
 	if av == nil || host == nil {
 		return NoSuchApp
 	}
-	task := models.TestApplicationTask(av, host)
-	err := hub.Dispatch(host.IP, task)
+	task := types.TestApplicationTask(av, host)
+	err := dot.LeviHub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -132,8 +132,8 @@ func DeployApplicationHandler(req *Request) interface{} {
 	daemon := req.Form.Get("daemon")
 	sub := req.Form.Get("sub_app")
 
-	av := models.GetVersion(name, version)
-	hosts := models.GetHostsByIPs(ips)
+	av := types.GetVersion(name, version)
+	hosts := types.GetHostsByIPs(ips)
 	if av == nil {
 		return NoSuchApp
 	}
@@ -150,7 +150,7 @@ func DeployApplicationHandler(req *Request) interface{} {
 		return JSON{"r": 1, "msg": "no daemon defined"}
 	}
 
-	taskIds, err := DeployApplicationHelper(av, hosts, appyaml, daemon == "true")
+	taskIds, err := dot.DeployApplicationHelper(av, hosts, appyaml, daemon == "true")
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -162,12 +162,12 @@ func RemoveApplicationHandler(req *Request) interface{} {
 	version := req.URL.Query().Get(":version")
 	ip := req.Form.Get("host")
 
-	av := models.GetVersion(name, version)
-	host := models.GetHostByIP(ip)
+	av := types.GetVersion(name, version)
+	host := types.GetHostByIP(ip)
 	if av == nil || host == nil {
 		return NoSuchApp
 	}
-	taskIds, err := RemoveApplicationFromHostHelper(av, host)
+	taskIds, err := dot.RemoveApplicationFromHostHelper(av, host)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -181,13 +181,13 @@ func UpdateApplicationHandler(req *Request) interface{} {
 	ips := req.Form["hosts"]
 	toVersion := req.Form.Get("to")
 
-	from := models.GetVersion(name, fromVersion)
-	to := models.GetVersion(name, toVersion)
-	hosts := models.GetHostsByIPs(ips)
+	from := types.GetVersion(name, fromVersion)
+	to := types.GetVersion(name, toVersion)
+	hosts := types.GetHostsByIPs(ips)
 	if from == nil || to == nil {
 		return JSON{"r": 1, "msg": fmt.Sprintf("no such app %v, %v", from, to)}
 	}
-	taskIds, err := UpdateApplicationHelper(from, to, hosts)
+	taskIds, err := dot.UpdateApplicationHelper(from, to, hosts)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -197,13 +197,13 @@ func UpdateApplicationHandler(req *Request) interface{} {
 func RemoveContainerHandler(req *Request) interface{} {
 	cid := req.URL.Query().Get(":cid")
 
-	container := models.GetContainerByCid(cid)
+	container := types.GetContainerByCid(cid)
 	if container == nil {
 		return NoSuchContainer
 	}
 	host := container.Host()
-	task := models.RemoveContainerTask(container)
-	err := hub.Dispatch(host.IP, task)
+	task := types.RemoveContainerTask(container)
+	err := dot.LeviHub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -219,7 +219,7 @@ func NewMySQLInstanceHandler(req *Request) interface{} {
 		mysqlName = "mysql"
 	}
 
-	if app := models.GetApplication(name); app == nil {
+	if app := types.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 
@@ -240,7 +240,7 @@ func NewMySQLInstanceHandler(req *Request) interface{} {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
-	err = models.AppendResource(name, env, mysqlName, mysql)
+	err = types.AppendResource(name, env, mysqlName, mysql)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "mysql": nil}
 	}
@@ -256,7 +256,7 @@ func NewRedisInstanceHandler(req *Request) interface{} {
 		redisName = "redis"
 	}
 
-	if app := models.GetApplication(name); app == nil {
+	if app := types.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 
@@ -277,7 +277,7 @@ func NewRedisInstanceHandler(req *Request) interface{} {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
-	err = models.AppendResource(name, env, redisName, redis)
+	err = types.AppendResource(name, env, redisName, redis)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "redis": nil}
 	}
@@ -291,7 +291,7 @@ func NewSentryDSNHandler(req *Request) interface{} {
 	if platform == "" {
 		return JSON{"r": 1, "msg": "no platform defined"}
 	}
-	if app := models.GetApplication(name); app == nil {
+	if app := types.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 	sentry, err := resources.NewSentryDSN(name, platform)
@@ -303,7 +303,7 @@ func NewSentryDSNHandler(req *Request) interface{} {
 		return JSON{"r": 1, "msg": "sentry not string", "sentry": nil}
 	}
 	// sentry 是 {"dsn": "udp://xxxx:yyyy@host:port/namespace"}
-	err = models.AppendResource(name, "prod", "sentry_dsn", dsn)
+	err = types.AppendResource(name, "prod", "sentry_dsn", dsn)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "sentry": nil}
 	}
@@ -312,7 +312,7 @@ func NewSentryDSNHandler(req *Request) interface{} {
 
 func NewInfluxdbHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
-	app := models.GetApplication(name)
+	app := types.GetApplication(name)
 	if app == nil {
 		return NoSuchApp
 	}
@@ -324,7 +324,7 @@ func NewInfluxdbHandler(req *Request) interface{} {
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "influxdb": nil}
 	}
-	err = models.AppendResource(name, "prod", "influxdb", influxdb)
+	err = types.AppendResource(name, "prod", "influxdb", influxdb)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error(), "influxdb": nil}
 	}
@@ -336,10 +336,10 @@ func RemoveResourceHandler(req *Request) interface{} {
 	key := req.Form.Get("name")
 	env := req.Form.Get("env")
 
-	if app := models.GetApplication(name); app == nil {
+	if app := types.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
-	err := models.RemoveResource(name, env, key)
+	err := types.RemoveResource(name, env, key)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}
@@ -351,7 +351,7 @@ func SyncDBHandler(req *Request) interface{} {
 	schema := req.Form.Get("schema")
 
 	r := JSON{"r": 1, "msg": ""}
-	app := models.GetApplication(name)
+	app := types.GetApplication(name)
 	if app == nil {
 		r["msg"] = fmt.Sprintf("app %s not found", name)
 		return r
@@ -372,19 +372,19 @@ func SyncDBHandler(req *Request) interface{} {
 
 func AppBranchHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
-	if app := models.GetApplication(name); app == nil {
+	if app := types.GetApplication(name); app == nil {
 		return NoSuchApp
 	}
 	if req.Method == "PUT" {
 		branch := req.Form.Get("branch")
-		err := models.SetHookBranch(name, branch)
+		err := types.SetHookBranch(name, branch)
 		if err != nil {
 			return JSON{"r": 1, "msg": err.Error()}
 		}
 		return JSON{"r": 0, "msg": "ok"}
 	}
 	if req.Method == "GET" {
-		branch, err := models.GetHookBranch(name)
+		branch, err := types.GetHookBranch(name)
 		if err != nil {
 			return JSON{"r": 1, "msg": err.Error(), "branch": ""}
 		}
@@ -397,11 +397,11 @@ func AddSubAppYamlHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
 	appyaml := req.Form.Get("appyaml")
-	av := models.GetVersion(name, version)
+	av := types.GetVersion(name, version)
 	if av == nil {
 		return NoSuchApp
 	}
-	var yaml models.AppYaml
+	var yaml types.AppYaml
 	if err := utils.YAMLDecode(appyaml, &yaml); err != nil {
 		return JSON{"r": 1, "msg": "not valid yaml file"}
 	}
@@ -419,7 +419,7 @@ func AddSubAppYamlHandler(req *Request) interface{} {
 func ListSubAppYamlHandler(req *Request) interface{} {
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
-	av := models.GetVersion(name, version)
+	av := types.GetVersion(name, version)
 	if av == nil {
 		return NoSuchApp
 	}
@@ -428,30 +428,30 @@ func ListSubAppYamlHandler(req *Request) interface{} {
 }
 
 func GetAllApplications(req *Request) interface{} {
-	return models.GetAllApplications(req.Start, req.Limit)
+	return types.GetAllApplications(req.Start, req.Limit)
 }
 
 func GetApplication(req *Request) interface{} {
-	return models.GetApplication(req.URL.Query().Get(":app"))
+	return types.GetApplication(req.URL.Query().Get(":app"))
 }
 
 func GetAppContainers(req *Request) interface{} {
-	app := models.GetApplication(req.URL.Query().Get(":app"))
+	app := types.GetApplication(req.URL.Query().Get(":app"))
 	if app == nil {
-		return []*models.Container{}
+		return []*types.Container{}
 	}
 	return app.Containers()
 }
 
 func GetAppVersions(req *Request) interface{} {
-	return models.GetVersions(req.URL.Query().Get(":app"), req.Start, req.Limit)
+	return types.GetVersions(req.URL.Query().Get(":app"), req.Start, req.Limit)
 }
 
 func GetAppJobs(req *Request) interface{} {
 	status := utils.Atoi(req.URL.Query().Get("status"), -1)
 	succ := utils.Atoi(req.URL.Query().Get("succ"), -1)
 	name := req.URL.Query().Get(":app")
-	return models.GetJobs(name, "", status, succ, req.Start, req.Limit)
+	return types.GetJobs(name, "", status, succ, req.Start, req.Limit)
 }
 
 func GetAppVersionJobs(req *Request) interface{} {
@@ -459,45 +459,45 @@ func GetAppVersionJobs(req *Request) interface{} {
 	succ := utils.Atoi(req.URL.Query().Get("succ"), -1)
 	name := req.URL.Query().Get(":app")
 	version := req.URL.Query().Get(":version")
-	return models.GetJobs(name, version, status, succ, req.Start, req.Limit)
+	return types.GetJobs(name, version, status, succ, req.Start, req.Limit)
 }
 
 func GetAppVersionContainers(req *Request) interface{} {
-	av := models.GetVersion(req.URL.Query().Get(":app"), req.URL.Query().Get(":version"))
+	av := types.GetVersion(req.URL.Query().Get(":app"), req.URL.Query().Get(":version"))
 	if av == nil {
-		return []*models.Container{}
+		return []*types.Container{}
 	}
 	return av.Containers()
 }
 
 func GetAppVersion(req *Request) interface{} {
-	return models.GetVersion(req.URL.Query().Get(":app"), req.URL.Query().Get(":version"))
+	return types.GetVersion(req.URL.Query().Get(":app"), req.URL.Query().Get(":version"))
 }
 
 func GetHostByID(req *Request) interface{} {
-	return models.GetHostByID(utils.Atoi(req.URL.Query().Get(":id"), 0))
+	return types.GetHostByID(utils.Atoi(req.URL.Query().Get(":id"), 0))
 }
 
 func GetAllHosts(req *Request) interface{} {
-	return models.GetAllHosts(req.Start, req.Limit)
+	return types.GetAllHosts(req.Start, req.Limit)
 }
 
 func GetContainerByCid(req *Request) interface{} {
-	return models.GetContainerByCid(req.URL.Query().Get(":cid"))
+	return types.GetContainerByCid(req.URL.Query().Get(":cid"))
 }
 
 func GetContainers(req *Request) interface{} {
 	hostID := utils.Atoi(req.URL.Query().Get("host_id"), -1)
-	return models.GetContainers(hostID, req.URL.Query().Get("name"),
+	return types.GetContainers(hostID, req.URL.Query().Get("name"),
 		req.URL.Query().Get("version"), req.Start, req.Limit)
 }
 
 func GetAppVersionByID(req *Request) interface{} {
-	return models.GetVersionByID(utils.Atoi(req.URL.Query().Get(":id"), 0))
+	return types.GetVersionByID(utils.Atoi(req.URL.Query().Get(":id"), 0))
 }
 
 func GetJob(req *Request) interface{} {
-	return models.GetJob(utils.Atoi(req.URL.Query().Get(":id"), 0))
+	return types.GetJob(utils.Atoi(req.URL.Query().Get(":id"), 0))
 }
 
 func GetJobs(req *Request) interface{} {
@@ -505,11 +505,11 @@ func GetJobs(req *Request) interface{} {
 	succ := utils.Atoi(req.URL.Query().Get("succ"), -1)
 	name := req.URL.Query().Get("name")
 	version := req.URL.Query().Get("version")
-	return models.GetJobs(name, version, status, succ, req.Start, req.Limit)
+	return types.GetJobs(name, version, status, succ, req.Start, req.Limit)
 }
 
 func init() {
-	RestServer = pat.New()
+	RestAPIServer = pat.New()
 
 	rs := map[string]map[string]func(*Request) interface{}{
 		"POST": {
@@ -563,7 +563,7 @@ func init() {
 
 	for method, routes := range rs {
 		for route, handler := range routes {
-			RestServer.Add(method, route, http.HandlerFunc(JSONWrapper(handler)))
+			RestAPIServer.Add(method, route, http.HandlerFunc(JSONWrapper(handler)))
 		}
 	}
 }

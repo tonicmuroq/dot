@@ -1,8 +1,9 @@
-package main
+package apiserver
 
 import (
-	"./utils"
 	"net/http"
+
+	"utils"
 )
 
 type Request struct {

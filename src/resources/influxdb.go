@@ -1,15 +1,16 @@
 package resources
 
 import (
-	"../config"
-	"../utils"
 	"fmt"
+
 	"github.com/influxdb/influxdb/client"
-	"time"
+
+	"config"
+	"utils"
 )
 
 func NewInfluxdb(appname string) (map[string]interface{}, error) {
-	password := utils.CreateSha1HexValue([]byte(appname + time.Now().String()))[:8]
+	password := utils.RandomString(8)
 	client, err := client.NewClient(&client.ClientConfig{
 		Host:     fmt.Sprintf("%v:%v", config.Config.Influxdb.Host, config.Config.Influxdb.Port),
 		Username: config.Config.Influxdb.Username,

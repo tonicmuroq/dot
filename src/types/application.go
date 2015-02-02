@@ -1,14 +1,16 @@
-package models
+package types
 
 import (
-	"../config"
-	. "../utils"
 	"errors"
 	"fmt"
-	"github.com/astaxie/beego/orm"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/astaxie/beego/orm"
+
+	"config"
+	. "utils"
 )
 
 var (

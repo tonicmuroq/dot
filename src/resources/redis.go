@@ -1,11 +1,12 @@
 package resources
 
 import (
-	"../config"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"config"
 )
 
 func NewRedisInstance(appname string) (map[string]interface{}, error) {

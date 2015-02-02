@@ -1,4 +1,4 @@
-package main
+package dot
 
 import (
 	"errors"
@@ -12,11 +12,11 @@ import (
 	"text/template"
 	"time"
 
-	"./config"
-	"./models"
-	. "./utils"
-
 	"github.com/gorilla/websocket"
+
+	"config"
+	"types"
+	. "utils"
 )
 
 const (
@@ -24,20 +24,20 @@ const (
 	maxMessageSize     = 1024 * 1024
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024 * 1024,
-	WriteBufferSize: 1024 * 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
-}
+var (
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024 * 1024,
+		WriteBufferSize: 1024 * 1024,
+		CheckOrigin:     func(r *http.Request) bool { return true },
+	}
+	ZeroTime time.Time
+	LeviHub  *Hub
+)
 
-var ZeroTime time.Time
-
-// websocket 连接
 type Connection struct {
-	ws     *websocket.Conn
-	host   string
-	port   int
-	closed bool
+	ws   *websocket.Conn
+	host string
+	port int
 }
 
 type NInfo struct {
@@ -45,7 +45,6 @@ type NInfo struct {
 	SubApp string
 }
 
-// 保存所有连接, 定时 ping
 type Hub struct {
 	levis         map[string]*Levi
 	lastCheckTime map[string]time.Time
@@ -100,16 +99,16 @@ func (self *Hub) Run() {
 
 func (self *Hub) RestartNginx() {
 	for avID, subnames := range self.apps {
-		av := models.GetVersionByID(avID)
+		av := types.GetVersionByID(avID)
 		if av == nil {
 			continue
 		}
-		app := models.GetApplication(av.Name)
+		app := types.GetApplication(av.Name)
 		if app == nil {
 			continue
 		}
 
-		cg := map[string][]*models.Container{}
+		cg := map[string][]*types.Container{}
 		for _, c := range app.Containers() {
 			if c.SubApp == "" {
 				cg[c.AppName] = append(cg[c.AppName], c)
@@ -194,7 +193,7 @@ func (self *Hub) RemoveLevi(host string) {
 	if !ok || levi == nil {
 		return
 	}
-	if h := models.GetHostByIP(host); h != nil {
+	if h := types.GetHostByIP(host); h != nil {
 		h.Offline()
 	}
 	delete(self.levis, host)
@@ -208,54 +207,42 @@ func (self *Hub) Close() {
 	self.finished = true
 }
 
-func (self *Hub) Dispatch(host string, task *models.Task) error {
+func (self *Hub) Dispatch(host string, task *types.Task) error {
 	levi, ok := self.levis[host]
 	if task == nil {
 		return errors.New("task is nil")
 	}
 	if !ok || levi == nil {
-		if job := models.GetJob(task.ID); job != nil {
-			job.Done(models.FAIL, "failed cuz no levi alive")
+		if job := types.GetJob(task.ID); job != nil {
+			job.Done(types.FAIL, "failed cuz no levi alive")
 		}
 		return errors.New(fmt.Sprintf("%s levi not exists", host))
 	}
 	levi.inTask <- task
-	if task != nil && (task.Type == models.TESTAPPLICATION || task.Type == models.BUILDIMAGE) {
+	if task != nil && (task.Type == types.TESTAPPLICATION || task.Type == types.BUILDIMAGE) {
 		streamLogHub.GetBufferedLog(task.ID, true)
 	}
 	return nil
 }
 
-var hub = &Hub{
-	levis:         make(map[string]*Levi),
-	lastCheckTime: make(map[string]time.Time),
-	apps:          map[int][]string{},
-	done:          make(chan *NInfo),
-	immediate:     make(chan bool),
-	size:          10,
-	finished:      false,
+func init() {
+	LeviHub = &Hub{
+		levis:         make(map[string]*Levi),
+		lastCheckTime: make(map[string]time.Time),
+		apps:          map[int][]string{},
+		done:          make(chan *NInfo),
+		immediate:     make(chan bool),
+		size:          10,
+		finished:      false,
+	}
 }
 
 // Connection methods
-func (self *Connection) Read() ([]byte, error) {
-	_, message, err := self.ws.ReadMessage()
-	return message, err
-}
-
-func (self *Connection) Write(mt int, payload []byte) error {
-	return self.ws.WriteMessage(mt, payload)
-}
-
 func (self *Connection) Ping(payload []byte) error {
-	return self.Write(websocket.PingMessage, payload)
-}
-
-func (self *Connection) Send(payload []byte) error {
-	return self.Write(websocket.TextMessage, payload)
+	return self.ws.WriteMessage(websocket.PingMessage, payload)
 }
 
 func (self *Connection) CloseConnection() error {
-	self.closed = true
 	return self.ws.Close()
 }
 
@@ -264,15 +251,15 @@ func NewConnection(ws *websocket.Conn, host string, port int) *Connection {
 	ws.SetReadDeadline(ZeroTime)
 	ws.SetWriteDeadline(ZeroTime)
 	ws.SetPongHandler(func(s string) error {
-		hub.lastCheckTime[host] = time.Now()
+		LeviHub.lastCheckTime[host] = time.Now()
 		Logger.Info("Connection pong: ", s, " from host: ", host)
 		return nil
 	})
-	c := &Connection{ws: ws, host: host, port: port, closed: false}
+	c := &Connection{ws: ws, host: host, port: port}
 	return c
 }
 
-func ServeWs(w http.ResponseWriter, r *http.Request) {
+func ServeWS(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", 405)
 		return
@@ -293,8 +280,8 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 	// 同时开始 listen
 	c := NewConnection(ws, ip, port)
 	levi := NewLevi(c, config.Config.Task.Queuesize)
-	hub.AddLevi(levi)
-	models.NewHost(ip, "")
+	LeviHub.AddLevi(levi)
+	types.NewHost(ip, "")
 
 	go levi.Run()
 	go levi.WaitTask()

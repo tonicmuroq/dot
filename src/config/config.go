@@ -1,12 +1,13 @@
 package config
 
 import (
-	. "../utils"
 	"flag"
 	"io/ioutil"
 	"os"
 
 	"gopkg.in/yaml.v1"
+
+	. "utils"
 )
 
 type DbConfig struct {

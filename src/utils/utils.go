@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -11,8 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/jmcvetta/randutil"
 	"gopkg.in/yaml.v1"
 )
 
@@ -46,19 +44,9 @@ func EnsureFileAbsent(path string) error {
 	return os.Remove(path)
 }
 
-func CreateSha1HexValue(data []byte) string {
-	r := sha1.Sum(data)
-	x := make([]byte, len(r))
-	for index, d := range r {
-		x[index] = d
-	}
-	return hex.EncodeToString(x)
-}
-
-func CreateRandomHexString(salt string, length int) string {
-	t := time.Now().String()
-	code := CreateSha1HexValue([]byte(salt + t))
-	return code[:length]
+func RandomString(length int) string {
+	r, _ := randutil.AlphaString(length)
+	return r
 }
 
 // 把src copy到dst
