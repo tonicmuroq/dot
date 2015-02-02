@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -122,55 +120,57 @@ func (self *Hub) RestartNginx() {
 			if appname == "" {
 				appname = app.Name
 			}
-			conf := path.Join(config.Config.Nginx.Conf, fmt.Sprintf("%s.conf", appname))
-			remoteConfig := fmt.Sprintf("/etc/nginx/conf.d/%s.conf", appname)
-			var data = struct {
-				Name      string
-				PodName   string
-				Static    string
-				Path      string
-				UpStreams []string
-			}{
-				Name:      appname,
-				PodName:   config.Config.PodName,
-				Static:    path.Join("/", av.StaticPath()),
-				Path:      path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", av.Name, av.Version)),
-				UpStreams: []string{},
-			}
+
+			localUD := path.Join(config.Config.Nginx.LocalUpDir, fmt.Sprintf("%s.upstream.conf", appname))
+			localSD := path.Join(config.Config.Nginx.LocalServerDir, fmt.Sprintf("%s.server.conf", appname))
+			remoteUD := path.Join(config.Config.Nginx.RemoteUpDir, fmt.Sprintf("%s.upstream.conf", appname))
+			remoteSD := path.Join(config.Config.Nginx.RemoteServerDir, fmt.Sprintf("%s.server.conf", appname))
 
 			cs, exists := cg[appname]
 			if !exists {
 				// 删
-				EnsureFileAbsent(conf)
-				if err := exec.Command("res", "nginx_clean", remoteConfig).Run(); err != nil {
-					Logger.Info("res", "nginx_clean", remoteConfig)
+				EnsureFileAbsent(localUD)
+				EnsureFileAbsent(localSD)
+				if err := exec.Command("res", "nginx_clean", remoteUD).Run(); err != nil {
+					Logger.Info("res", "nginx_clean", remoteUD)
 					Logger.Info(err)
 				}
-			} else {
-				f, err := os.Create(conf)
-				defer f.Close()
-				if err != nil {
-					Logger.Info("Create nginx conf failed", err)
-					continue
-				}
-				for _, container := range cs {
-					if container.Port == 0 {
-						// ignore daemon
-						continue
-					}
-					upStream := fmt.Sprintf("%s:%v", container.Host().IP, container.Port)
-					data.UpStreams = append(data.UpStreams, upStream)
-				}
-				tmpl := template.Must(template.ParseFiles(config.Config.Nginx.Template))
-				if err := tmpl.Execute(f, data); err != nil {
-					Logger.Info("Render nginx conf failed", err)
-				}
-				if err := exec.Command("res", "nginx_reload", conf, remoteConfig).Run(); err != nil {
-					Logger.Info("res", "nginx_reload", conf, remoteConfig)
+				if err := exec.Command("res", "nginx_clean", remoteSD).Run(); err != nil {
+					Logger.Info("res", "nginx_clean", remoteSD)
 					Logger.Info(err)
 				}
+				continue
 			}
 
+			ups := []string{}
+			for _, c := range cs {
+				if c.Port == 0 {
+					continue
+				}
+				ups = append(ups, fmt.Sprintf("%s:%v", c.Host().IP, c.Port))
+			}
+
+			// create upstream
+			if err := UpstreamConf(appname, ups, config.Config.Nginx.UpstreamTemplate, localUD); err != nil {
+				Logger.Info("failed to create upstream for", appname)
+				continue
+			}
+			if err := exec.Command("res", "nginx_reload", localUD, remoteUD).Run(); err != nil {
+				Logger.Info("res", "nginx_reload", localUD, remoteUD)
+				Logger.Info(err)
+			}
+
+			// create server
+			if err := ServerConf(appname, config.Config.PodName, path.Join("/", av.StaticPath()),
+				path.Join(config.Config.Nginx.Staticdir, fmt.Sprintf("/%s/%s/", av.Name, av.Version)),
+				config.Config.Nginx.ServerTemplate, localSD); err != nil {
+				Logger.Info("failed to create server for", appname)
+				continue
+			}
+			if err := exec.Command("res", "nginx_reload", localSD, remoteSD).Run(); err != nil {
+				Logger.Info("res", "nginx_reload", localSD, remoteSD)
+				Logger.Info(err)
+			}
 		}
 
 		app.CreateDNS()

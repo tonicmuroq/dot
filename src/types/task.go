@@ -137,8 +137,10 @@ func (lgt *LeviGroupedTask) RestartSubAppNames() []string {
 		g[remove.SubApp] += 1
 	}
 	r := make([]string, len(g))
+	i := 0
 	for key, _ := range g {
-		r = append(r, key)
+		r[i] = key
+		i = i + 1
 	}
 	return r
 }

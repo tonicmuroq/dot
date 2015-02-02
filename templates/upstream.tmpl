@@ -1,0 +1,6 @@
+upstream {{.Name}} {
+{{range $upStream:= .UpStreams}}
+    server {{$upStream}} max_fails=1 fail_timeout=1s;
+{{end}}
+    keepalive 16;
+}

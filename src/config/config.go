@@ -35,6 +35,14 @@ type NginxConfig struct {
 	Staticsrcdir string
 	Conf         string
 	Port         int
+
+	UpstreamTemplate string `yaml:"upstream_template"`
+	LocalUpDir       string `yaml:"local_up_dir"`
+	RemoteUpDir      string `yaml:"remote_up_dir"`
+
+	ServerTemplate  string `yaml:"server_template"`
+	LocalServerDir  string `yaml:"local_server_dir"`
+	RemoteServerDir string `yaml:"remote_server_dir"`
 }
 
 type InfluxdbConfig struct {
