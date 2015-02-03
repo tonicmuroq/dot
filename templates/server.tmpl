@@ -1,0 +1,28 @@
+server {
+    listen 80;
+    server_name {{.Name}}.{{.PodName}}.hunantv.com;
+
+    underscores_in_headers on;
+    ignore_invalid_headers off;
+
+    rewrite ^/(.*)/favicon.ico$ /favicon.ico last;
+
+    access_log  /mnt/mfs/logs/nbe/master/{{.Name}}-access.log main;
+    error_log   /mnt/mfs/logs/nbe/master/{{.Name}}-error.log error;
+
+    location ~* (favicon.ico) {
+        log_not_found off;
+        break;
+    }
+
+    {{if ne .Static "/"}}
+    location ^~ {{.Static}} {
+        root {{.Path}};
+    }
+    {{end}}
+
+    location ~ ^/ {
+        proxy_set_header X-NBE-APPNAME {{.Name}};
+        proxy_pass http://{{.Name}};
+    }
+}
