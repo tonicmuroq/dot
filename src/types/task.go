@@ -117,8 +117,9 @@ func (lgt *LeviGroupedTask) AppendTask(task *Task) {
 	case REMOVECONTAINER:
 		lgt.Tasks.Remove = append(lgt.Tasks.Remove, task)
 	case UPDATECONTAINER:
-		lgt.Tasks.Add = append(lgt.Tasks.Add, task)
-		lgt.Tasks.Remove = append(lgt.Tasks.Remove, task)
+		add, remove := SplitUpdateTask(task)
+		lgt.Tasks.Add = append(lgt.Tasks.Add, add)
+		lgt.Tasks.Remove = append(lgt.Tasks.Remove, remove)
 	case BUILDIMAGE:
 		lgt.Tasks.Build = append(lgt.Tasks.Build, task)
 	}
@@ -316,6 +317,37 @@ func UpdateContainerTask(container *Container, av *AppVersion) *Task {
 		SubApp:    container.SubApp,
 		RmImage:   rmImg,
 	}
+}
+
+// Update 需要切割成两个任务
+// 否则任务那会死
+func SplitUpdateTask(task *Task) (*Task, *Task) {
+	addTask := &Task{
+		ID:       task.ID,
+		Name:     task.Name,
+		Version:  task.Version,
+		Port:     task.Port,
+		Cmd:      task.Cmd,
+		Type:     UPDATECONTAINER,
+		Uid:      task.Uid,
+		Bind:     task.Bind,
+		Memory:   task.Memory,
+		CpuShare: task.CpuShare,
+		CpuSet:   task.CpuSet,
+		Daemon:   task.Daemon,
+		SubApp:   task.SubApp,
+	}
+	removeTask := &Task{
+		ID:        task.ID,
+		Name:      task.Name,
+		Version:   task.Version,
+		Type:      UPDATECONTAINER,
+		Uid:       0,
+		Container: task.Container,
+		RmImage:   task.RmImage,
+		SubApp:    task.SubApp,
+	}
+	return addTask, removeTask
 }
 
 // build任务的name就是应用的projectname
