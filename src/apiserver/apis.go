@@ -78,7 +78,7 @@ func AddContainerHandler(req *Request) interface{} {
 	if daemon == "true" && len(appyaml.Daemon) == 0 {
 		return JSON{"r": 1, "msg": "daemon set true but no daemon defined"}
 	}
-	task := types.AddContainerTask(av, host, appyaml, daemon == "true")
+	task := types.AddContainerTask(av, host, appyaml, daemon == "true", req.Form["cores"])
 	err = dot.LeviHub.Dispatch(host.IP, task)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
@@ -180,6 +180,12 @@ func UpdateApplicationHandler(req *Request) interface{} {
 
 	ips := req.Form["hosts"]
 	toVersion := req.Form.Get("to")
+	coreList := req.Form.Get("core_list")
+
+	coreMap := map[string]string{}
+	if coreList != "" {
+		utils.JSONDecode(coreList, &coreMap)
+	}
 
 	from := types.GetVersion(name, fromVersion)
 	to := types.GetVersion(name, toVersion)
@@ -187,7 +193,7 @@ func UpdateApplicationHandler(req *Request) interface{} {
 	if from == nil || to == nil {
 		return JSON{"r": 1, "msg": fmt.Sprintf("no such app %v, %v", from, to)}
 	}
-	taskIds, err := dot.UpdateApplicationHelper(from, to, hosts)
+	taskIds, err := dot.UpdateApplicationHelper(from, to, hosts, coreMap)
 	if err != nil {
 		return JSON{"r": 1, "msg": err.Error()}
 	}

@@ -15,7 +15,7 @@ func DeployApplicationHelper(av *types.AppVersion, hosts []*types.Host, appyaml 
 		}
 		cs := types.GetContainerByHostAndAppVersion(host, av)
 		if len(cs) == 0 {
-			task := types.AddContainerTask(av, host, appyaml, daemon)
+			task := types.AddContainerTask(av, host, appyaml, daemon, []string{})
 			if task != nil {
 				taskIds = append(taskIds, task.ID)
 				err = LeviHub.Dispatch(host.IP, task)
@@ -24,7 +24,7 @@ func DeployApplicationHelper(av *types.AppVersion, hosts []*types.Host, appyaml 
 			}
 		} else {
 			for _, c := range cs {
-				task := types.UpdateContainerTask(c, av)
+				task := types.UpdateContainerTask(c, av, "")
 				if task != nil {
 					taskIds = append(taskIds, task.ID)
 					err = LeviHub.Dispatch(host.IP, task)
@@ -52,7 +52,7 @@ func RemoveApplicationFromHostHelper(av *types.AppVersion, host *types.Host) ([]
 	return taskIds, err
 }
 
-func UpdateApplicationHelper(from, to *types.AppVersion, hosts []*types.Host) ([]int, error) {
+func UpdateApplicationHelper(from, to *types.AppVersion, hosts []*types.Host, coreMap map[string]string) ([]int, error) {
 	var err error
 	taskIds := []int{}
 	for _, host := range hosts {
@@ -62,7 +62,11 @@ func UpdateApplicationHelper(from, to *types.AppVersion, hosts []*types.Host) ([
 		oldContainers := types.GetContainerByHostAndAppVersion(host, from)
 		if len(oldContainers) > 0 {
 			for _, c := range oldContainers {
-				task := types.UpdateContainerTask(c, to)
+				cores, exists := coreMap[c.ContainerID]
+				if !exists {
+					cores = ""
+				}
+				task := types.UpdateContainerTask(c, to, cores)
 				if task != nil {
 					taskIds = append(taskIds, task.ID)
 					err = LeviHub.Dispatch(host.IP, task)
