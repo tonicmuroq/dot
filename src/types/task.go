@@ -177,7 +177,7 @@ func (t *Task) Done() {
 	t.done = true
 }
 
-func AddContainerTask(av *AppVersion, host *Host, appYaml *AppYaml, daemon bool) *Task {
+func AddContainerTask(av *AppVersion, host *Host, appYaml *AppYaml, daemon bool, cores []string) *Task {
 	if len(appYaml.Daemon) == 0 && daemon {
 		Logger.Info("no daemon defined in app.yaml")
 		return nil
@@ -215,6 +215,11 @@ func AddContainerTask(av *AppVersion, host *Host, appYaml *AppYaml, daemon bool)
 		return nil
 	}
 
+	cpuset := ""
+	if config.Config.UseCPUSet && len(cores) != 0 {
+		cpuset = strings.Join(cores, ",")
+	}
+
 	return &Task{
 		ID:       job.ID,
 		Name:     strings.ToLower(av.Name),
@@ -226,7 +231,7 @@ func AddContainerTask(av *AppVersion, host *Host, appYaml *AppYaml, daemon bool)
 		Bind:     bind,
 		Memory:   config.Config.Task.Memory,
 		CpuShare: config.Config.Task.CpuShare,
-		CpuSet:   config.Config.Task.CpuSet,
+		CpuSet:   cpuset,
 		Daemon:   daemonID,
 		SubApp:   subapp,
 	}
@@ -262,7 +267,7 @@ func RemoveContainerTask(container *Container) *Task {
 	}
 }
 
-func UpdateContainerTask(container *Container, av *AppVersion) *Task {
+func UpdateContainerTask(container *Container, av *AppVersion, cores string) *Task {
 	host := container.Host()
 	oav := container.AppVersion()
 	if host == nil || oav == nil {
@@ -300,6 +305,10 @@ func UpdateContainerTask(container *Container, av *AppVersion) *Task {
 		return nil
 	}
 
+	if !config.Config.UseCPUSet {
+		cores = ""
+	}
+
 	return &Task{
 		ID:        job.ID,
 		Name:      strings.ToLower(av.Name),
@@ -311,7 +320,7 @@ func UpdateContainerTask(container *Container, av *AppVersion) *Task {
 		Bind:      bind,
 		Memory:    config.Config.Task.Memory,
 		CpuShare:  config.Config.Task.CpuShare,
-		CpuSet:    config.Config.Task.CpuSet,
+		CpuSet:    cores,
 		Daemon:    daemonID,
 		Container: container.ContainerID,
 		SubApp:    container.SubApp,

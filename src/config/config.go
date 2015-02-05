@@ -62,6 +62,7 @@ type DotConfig struct {
 	Maxport    int
 	DNSSuffix  string `yaml:"dns_suffix"`
 	PodName    string `yaml:"podname"`
+	UseCPUSet  bool   `yaml:"use_cpu_set"`
 
 	Db       DbConfig
 	Dbmgr    DbConfig
